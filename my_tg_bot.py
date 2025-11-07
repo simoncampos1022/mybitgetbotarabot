@@ -12,11 +12,17 @@ import bitget.v2.mix.account_api as maxAccountApi
 import bitget.v2.mix.market_api as maxMarketApi
 import bitget.v2.mix.order_api as maxOrderApi
 
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
+import asyncio
+
 ETHUSDT_SYMBOL = "ETHUSDT"
 PRODUCT_TYPE = "USDT-FUTURES"
 MARGIN_COIN = "USDT"
 MARGIN_MODE = "isolated"
 CSV_FILE = "my_bitget_eth_history.csv"
+
+TELEGRAM_BOT_TOKEN = "8450626645:AAFA13SAXi461H56dDqRjbh-ZyE8IGuguIo"
 
 LEVERAGE = 10
 POSITION_SIZE_RATIO = 0.4
@@ -34,7 +40,7 @@ SECOND_SL_LEVEL = 0.1
 
 class AutoTradeBot:
     def __init__(self):
-        self.flag_api_sent = True
+        self.flag_api_sent = False
         self.running = True
         self.trade_lock = threading.Lock()
         self.price_lock = threading.Lock()
@@ -61,7 +67,10 @@ class AutoTradeBot:
         self.current_vol_os = 0.0
         self.current_rsi_value = 0.0
         self.orderType = "market"
+        self.telegram_app = None
+        self.message_queue = Queue()
         self.balance = self.fetch_real_balance()
+        self.initial_balance = self.balance if self.balance is not None else 100.0
         self.set_leverage(LEVERAGE)
 
         self.current_price = self.get_current_price()
@@ -110,6 +119,426 @@ class AutoTradeBot:
         # Start background threads
         threading.Thread(target=self.strategy_loop, daemon=True).start()
         threading.Thread(target=self.monitor_positions, daemon=True).start()
+        threading.Thread(target=self.process_telegram_messages, daemon=True).start()
+
+    
+    def set_telegram_app(self, app):
+        """Set the telegram application after it's created"""
+        self.telegram_app = app
+
+    def get_main_keyboard(self):
+        """Create the main button keyboard"""
+        keyboard = [
+            [KeyboardButton("📊 Status"), KeyboardButton("💰 Balance")],
+            [KeyboardButton("📋 Positions"), KeyboardButton("📜 Recent History")],
+            [KeyboardButton("📈 Total History")],
+            [KeyboardButton("📈 Open Long"), KeyboardButton("📉 Open Short")],
+            [KeyboardButton("Half Close Long"), KeyboardButton("Half Close Short")],
+            [KeyboardButton("🔴 Close Long"), KeyboardButton("🔴 Close Short")],
+        ]
+        return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+    # ========== Telegram Message System ==========
+    def send_telegram_message(self, message, chat_id=None):
+        """Queue a message to be sent via Telegram - thread-safe version"""
+        if not self.telegram_app:
+            print(f"[TELEGRAM] App not initialized: {message}")
+            return
+            
+        self.message_queue.put({
+            'message': message,
+            'chat_id': chat_id
+        })
+
+    def process_telegram_messages(self):
+        """Process Telegram messages from the queue in a separate thread"""
+        while self.running:
+            try:
+                if not self.message_queue.empty():
+                    message_data = self.message_queue.get()
+                    
+                    if self.telegram_app and hasattr(self.telegram_app, 'bot'):
+                        try:
+                            # Create a new event loop for this thread
+                            loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(loop)
+                            
+                            # Run the async function
+                            loop.run_until_complete(
+                                self.send_telegram_message_async(
+                                    message_data['message'],
+                                    message_data['chat_id']
+                                )
+                            )
+                            loop.close()
+                            
+                        except Exception as e:
+                            print(f"[TELEGRAM QUEUE] Error in event loop: {e}")
+                    
+                    self.message_queue.task_done()
+                
+                time.sleep(0.1)  # Small delay to prevent busy waiting
+                
+            except Exception as e:
+                print(f"[TELEGRAM QUEUE] Error processing message: {e}")
+                time.sleep(1)
+
+    async def send_telegram_message_async(self, message, chat_id=None):
+        """Async method to send Telegram message"""
+        try:
+            if chat_id:
+                await self.telegram_app.bot.send_message(
+                    chat_id=chat_id,
+                    text=message,
+                    reply_markup=self.get_main_keyboard(),
+                    parse_mode='Markdown'
+                )
+                print(f"[TELEGRAM] Message sent to {chat_id}")
+            else:
+                print(f"[TELEGRAM] No chat_id provided for: {message}")
+        except Exception as e:
+            print(f"[TELEGRAM ASYNC] Error sending message: {e}")
+
+    def get_status_message(self):
+        """Generate comprehensive status message"""
+        current_price = self.get_current_price()
+        price_msg = f"${current_price:.2f}" if current_price else "N/A"
+        
+        # Position info
+        long_pos = self.current_long_position
+        short_pos = self.current_short_position
+        
+        position_info = ""
+        if long_pos:
+            position_info += f"📈 LONG: ${long_pos['entry_price']:.2f} | SL: ${long_pos['stop_loss']:.2f} | TP: ${long_pos['take_profit']:.2f}\n"
+        if short_pos:
+            position_info += f"📉 SHORT: ${short_pos['entry_price']:.2f} | SL: ${short_pos['stop_loss']:.2f} | TP: ${short_pos['take_profit']:.2f}\n"
+        if not long_pos and not short_pos:
+            position_info = "📊 No open positions\n"
+        
+        # Indicators
+        indicators_info = f"""
+📊 Current Indicators:
+• Price: {price_msg}
+• ATR: {self.current_atr_value:.4f}
+• Volume Osc: {self.current_vol_os:.2f}%
+• RSI: {self.current_rsi_value:.2f}
+• FS: {self.fs[-1] if self.fs else 0:.4f}
+• TR: {self.tr[-1] if self.tr else 0:.4f}
+        """
+        
+        # Performance
+        closed_trades = [t for t in self.trades if t['status'] == 'closed']
+        total_pnl = sum(trade['pnl'] for trade in closed_trades)
+        win_trades = len([t for t in closed_trades if t['pnl'] > 0])
+        win_rate = (win_trades / len(closed_trades)) * 100 if closed_trades else 0
+        
+        performance_info = f"""
+💰 Performance:
+• Balance: ${self.balance:.2f}
+• Total PNL: ${total_pnl:.2f}
+• Total Trades: {len(closed_trades)}
+• Win Rate: {win_rate:.1f}%
+• Open Positions: {len([t for t in self.trades if t['status'] == 'open'])}
+        """
+        
+        return f"🤖 TRADING BOT STATUS\n\n{position_info}{indicators_info}{performance_info}"
+
+    def get_recent_history(self):
+        """Get last 3 closed positions"""
+        closed_trades = [t for t in self.trades if t['status'] == 'closed']
+        recent_trades = sorted(closed_trades, key=lambda x: x['exit_time'], reverse=True)[:3]
+        
+        if not recent_trades:
+            return "📜 *Recent History:*\nNo closed positions yet."
+        
+        history_msg = "📜 *Last 3 Closed Positions:*\n\n"
+        
+        for i, trade in enumerate(recent_trades, 1):
+            pnl_percent = (trade['pnl'] / (trade['entry_price'] * trade['size'] / LEVERAGE)) * 100 if trade['entry_price'] * trade['size'] > 0 else 0
+            
+            history_msg += f"""
+*Trade {i}:*
+• Action: `{trade['action'].upper()}`
+• Entry: `${trade['entry_price']:.2f}`
+• Exit: `${trade['exit_price']:.2f}`
+• PNL: `${trade['pnl']:.2f}` ({pnl_percent:+.2f}%)
+• Size: `{trade['size']:.4f}`
+• Reason: `{trade['reason']}`
+• Date: `{trade['exit_time'][:19]} UTC`
+────────────────────
+"""
+        
+        return history_msg
+
+    def get_total_history(self):
+        """Get all closed positions with summary"""
+        closed_trades = [t for t in self.trades if t['status'] == 'closed']
+        
+        if not closed_trades:
+            return "📈 *Total History:*\nNo closed positions yet."
+        
+        # Sort by exit time
+        closed_trades = sorted(closed_trades, key=lambda x: x['exit_time'], reverse=True)
+        
+        total_pnl = sum(trade['pnl'] for trade in closed_trades)
+        win_trades = len([t for t in closed_trades if t['pnl'] > 0])
+        loss_trades = len([t for t in closed_trades if t['pnl'] < 0])
+        win_rate = (win_trades / len(closed_trades)) * 100
+        
+        best_trade = max(closed_trades, key=lambda x: x['pnl']) if closed_trades else None
+        worst_trade = min(closed_trades, key=lambda x: x['pnl']) if closed_trades else None
+        
+        history_msg = f"""📈 *Total Trading History:*
+
+📊 *Summary:*
+• Total Trades: `{len(closed_trades)}`
+• Winning Trades: `{win_trades}`
+• Losing Trades: `{loss_trades}`
+• Win Rate: `{win_rate:.1f}%`
+• Total PNL: `${total_pnl:.2f}`
+• ROI: `{(total_pnl/self.initial_balance)*100:.2f}%`
+
+"""
+        
+        if best_trade:
+            best_pnl_percent = (best_trade['pnl'] / (best_trade['entry_price'] * best_trade['size'] / LEVERAGE)) * 100
+            history_msg += f"🏆 *Best Trade:* `${best_trade['pnl']:.2f}` ({best_pnl_percent:+.2f}%)\n"
+        
+        if worst_trade:
+            worst_pnl_percent = (worst_trade['pnl'] / (worst_trade['entry_price'] * worst_trade['size'] / LEVERAGE)) * 100
+            history_msg += f"📉 *Worst Trade:* `${worst_trade['pnl']:.2f}` ({worst_pnl_percent:+.2f}%)\n"
+        
+        history_msg += f"\n*Recent Trades:*\n"
+        
+        # Show last 5 trades in detail
+        for i, trade in enumerate(closed_trades[:5], 1):
+            pnl_percent = (trade['pnl'] / (trade['entry_price'] * trade['size'] / LEVERAGE)) * 100
+            emoji = "🟢" if trade['pnl'] > 0 else "🔴" if trade['pnl'] < 0 else "⚪"
+            
+            history_msg += f"""
+{emoji} *{trade['action'].upper()}* | PNL: `${trade['pnl']:.2f}` ({pnl_percent:+.2f}%)
+   Entry: `${trade['entry_price']:.2f}` | Exit: `${trade['exit_price']:.2f}`
+   Reason: `{trade['reason']}` | Date: `{trade['exit_time'][:19]}`
+"""
+        
+        if len(closed_trades) > 5:
+            history_msg += f"\n... and {len(closed_trades) - 5} more trades"
+        
+        return history_msg
+
+    # ========== Telegram Command Handlers ==========
+    async def handle_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /start command"""
+        welcome_text = """
+🤖 Welcome to the Trading Bot!
+
+Use the buttons below to control the bot or type /help for more information.
+
+⚠️ Warning: This bot allows all users to control trading. Use with caution!
+        """
+        await update.message.reply_text(
+            welcome_text,
+            reply_markup=self.get_main_keyboard()
+        )
+
+    async def handle_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /help command with buttons"""
+        help_text = """
+🤖 *Trading Bot Commands:*
+
+*Basic Commands:*
+• 📊 Status - Show current status and indicators
+• 💰 Balance - Show account balance and performance
+• 📋 Positions - Show open positions
+
+*Trading Commands:*
+• 📈 Open Long - Force open long position
+• 📉 Open Short - Force open short position  
+• 🔴 Close Long - Force close long position
+• 🔴 Close Short - Force close short position
+
+*History Commands:*
+• 📜 Recent History - Show last 3 closed positions
+• 📈 Total History - Show all trading history with stats
+
+*Auto Features:*
+• Strategy runs every hour
+• Real-time position monitoring
+• Automatic stop-loss/take-profit
+• Telegram notifications for all trades
+
+⚠️ *Note:* This bot is open to all users. Trade carefully!
+
+*Use the buttons below to control the bot:*
+        """
+        
+        await update.message.reply_text(
+            help_text, 
+            parse_mode='Markdown', 
+            reply_markup=self.get_main_keyboard()
+        )
+
+    async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle button presses and text messages - OPEN TO ALL USERS"""
+        message_text = update.message.text
+        chat_id = update.effective_chat.id
+
+        if message_text == "📊 Status":
+            status_msg = self.get_status_message()
+            await update.message.reply_text(
+                status_msg,
+                reply_markup=self.get_main_keyboard()
+            )
+            
+        elif message_text == "💰 Balance":
+            closed_trades = [t for t in self.trades if t['status'] == 'closed']
+            total_pnl = sum(trade['pnl'] for trade in closed_trades)
+            win_trades = len([t for t in closed_trades if t['pnl'] > 0])
+            win_rate = (win_trades / len(closed_trades)) * 100 if closed_trades else 0
+            
+            balance_msg = f"""
+💼 *Account Balance:*
+• Current Balance: `${self.balance:.2f}`
+• Initial Balance: `${self.initial_balance:.2f}`
+• Total PNL: `${total_pnl:.2f}`
+• ROI: `{(total_pnl/self.initial_balance)*100:.2f}%`
+
+📈 *Performance:*
+• Total Trades: `{len(closed_trades)}`
+• Winning Trades: `{win_trades}`
+• Win Rate: `{win_rate:.1f}%`
+• Open Positions: `{len([t for t in self.trades if t['status'] == 'open'])}`
+            """
+            await update.message.reply_text(
+                balance_msg, 
+                parse_mode='Markdown',
+                reply_markup=self.get_main_keyboard()
+            )
+            
+        elif message_text == "📈 Open Long":
+            await update.message.reply_text(
+                "🔄 Opening LONG position...",
+                reply_markup=self.get_main_keyboard()
+            )
+            self.open_position('long', chat_id)
+            
+        elif message_text == "📉 Open Short":
+            await update.message.reply_text(
+                "🔄 Opening SHORT position...",
+                reply_markup=self.get_main_keyboard()
+            )
+            self.open_position('short', chat_id)
+            
+        elif message_text == "🔴 Close Long":
+            if self.current_long_position:
+                await update.message.reply_text(
+                    "🔄 Closing LONG position...",
+                    reply_markup=self.get_main_keyboard()
+                )
+                self.close_position('long', "manual_close", chat_id)
+            else:
+                await update.message.reply_text(
+                    "❌ No LONG position to close",
+                    reply_markup=self.get_main_keyboard()
+                )
+                
+        elif message_text == "🔴 Close Short":
+            if self.current_short_position:
+                await update.message.reply_text(
+                    "🔄 Closing SHORT position...",
+                    reply_markup=self.get_main_keyboard()
+                )
+                self.close_position('short', "manual_close", chat_id)
+            else:
+                await update.message.reply_text(
+                    "❌ No SHORT position to close",
+                    reply_markup=self.get_main_keyboard()
+                )
+                
+        elif message_text == "📋 Positions":
+            positions_msg = "📋 *Current Positions:*\n\n"
+            
+            if self.current_long_position:
+                pos = self.current_long_position
+                unrealized_pnl = (self.get_current_price() - pos['entry_price']) * pos['size'] if self.get_current_price() else 0
+                positions_msg += f"""
+📈 *LONG Position:*
+• Entry Price: `${pos['entry_price']:.2f}`
+• Size: `{pos['size']:.4f}`
+• Stop Loss: `${pos['stop_loss']:.2f}`
+• Take Profit: `${pos['take_profit']:.2f}`
+• Unrealized PNL: `${unrealized_pnl:.2f}`
+• Trailing Stop: `{'Active' if pos.get('trailing_stop_active', False) else 'Inactive'}`
+                """
+            else:
+                positions_msg += "📈 *LONG Position:* No position\n"
+                
+            if self.current_short_position:
+                pos = self.current_short_position
+                unrealized_pnl = (pos['entry_price'] - self.get_current_price()) * pos['size'] if self.get_current_price() else 0
+                positions_msg += f"""
+📉 *SHORT Position:*
+• Entry Price: `${pos['entry_price']:.2f}`
+• Size: `{pos['size']:.4f}`
+• Stop Loss: `${pos['stop_loss']:.2f}`
+• Take Profit: `${pos['take_profit']:.2f}`
+• Unrealized PNL: `${unrealized_pnl:.2f}`
+• Trailing Stop: `{'Active' if pos.get('trailing_stop_active', False) else 'Inactive'}`
+                """
+            else:
+                positions_msg += "📉 *SHORT Position:* No position\n"
+                
+            await update.message.reply_text(
+                positions_msg, 
+                parse_mode='Markdown',
+                reply_markup=self.get_main_keyboard()
+            )
+            
+        elif message_text == "📜 Recent History":
+            recent_history = self.get_recent_history()
+            await update.message.reply_text(
+                recent_history,
+                parse_mode='Markdown',
+                reply_markup=self.get_main_keyboard()
+            )
+            
+        elif message_text == "📈 Total History":
+            total_history = self.get_total_history()
+            await update.message.reply_text(
+                total_history,
+                parse_mode='Markdown',
+                reply_markup=self.get_main_keyboard()
+            )
+        elif message_text == "Half Close Long":
+            if self.current_long_position:
+                await update.message.reply_text(
+                    "Halving LONG position…",
+                    reply_markup=self.get_main_keyboard()
+                )
+                self.close_half_position('long', chat_id)
+            else:
+                await update.message.reply_text(
+                    "No LONG position to half-close",
+                    reply_markup=self.get_main_keyboard()
+                )
+        elif message_text == "Half Close Short":
+            if self.current_short_position:
+                await update.message.reply_text(
+                    "Halving SHORT position…",
+                    reply_markup=self.get_main_keyboard()
+                )
+                self.close_half_position('short', chat_id)
+            else:
+                await update.message.reply_text(
+                    "No SHORT position to half-close",
+                    reply_markup=self.get_main_keyboard()
+                )
+        else:
+            await update.message.reply_text(
+                "❌ Unknown command. Use the buttons below or type /help for available commands.",
+                reply_markup=self.get_main_keyboard()
+            )
 
     def fetch_real_balance(self):
         """Fetch actual USDT available balance from Bitget Futures account"""
@@ -336,7 +765,7 @@ class AutoTradeBot:
         if changed:
             self.save_trades()
 
-    def execute_half_exit(self, position, current_price):
+    def execute_half_exit(self, position, current_price, chat_id=None):
         """Execute half position exit and update position size"""
         with self.trade_lock:
             if position.get('half_exit_done', False):
@@ -387,6 +816,14 @@ class AutoTradeBot:
 
             self.send_order(f'exit_{position["action"]}', current_price, half_size, 50)
 
+            self.send_telegram_message(f"[HALF EXIT] 🔵 Executed half exit for {position['action'].upper()} position | "
+                  f"Exit Price: ${current_price:.2f} | "
+                  f"Half Size: {half_size:.4f} | "
+                  f"Remaining Size: {remaining_size:.4f} | "
+                  f"PNL: ${net_pnl:.4f}",
+                  chat_id
+                  )
+            
             print(f"[HALF EXIT] 🔵 Executed half exit for {position['action'].upper()} position | "
                   f"Exit Price: ${current_price:.2f} | "
                   f"Half Size: {half_size:.4f} | "
@@ -488,18 +925,21 @@ class AutoTradeBot:
                 else:
                     self.open_position('short')
 
-    def open_position(self, direction):
+    def open_position(self, direction, chat_id=None):
         with self.trade_lock:
             if direction == 'long' and self.current_long_position:
                 print("[TRADE] Cannot open LONG: an open LONG position already exists.")
+                self.send_telegram_message("❌ Cannot open LONG: Position already exists", chat_id)
                 return
             if direction == 'short' and self.current_short_position:
                 print("[TRADE] Cannot open SHORT: an open SHORT position already exists.")
+                self.send_telegram_message("❌ Cannot open SHORT: Position already exists", chat_id)
                 return
         
             price = self.get_current_price()
             if price is None:
                 print("[TRADE] Failed to fetch current price for open position.")
+                self.send_telegram_message("❌ Failed to fetch price for opening position", chat_id)
                 return
             
             available = self.fetch_real_balance()
@@ -547,9 +987,19 @@ class AutoTradeBot:
 
             self.trades.append(trade)
             self.save_trades()
+            
+            self.send_telegram_message(
+                f"✅ *OPENED {direction.upper()} POSITION*\n"
+                f"Price: `${price:.2f}`\n"
+                f"Size: `{size:.4f}`\n"
+                f"SL: `${stop_loss:.2f}`\n"
+                f"TP: `${take_profit:.2f}`\n"
+                f"Leverage: `{LEVERAGE}x`",
+                chat_id
+            )
             print(f"[TRADE] 🟢 Opened {direction.upper()} position at ${price:.2f}, size: {size:.4f}, SL: ${stop_loss:.2f}")
 
-    def close_trade(self, trade, current_price, reason):
+    def close_trade(self, trade, current_price, reason, chat_id=None):
         with self.trade_lock:
             trade['exit_time'] = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
             trade['exit_price'] = current_price
@@ -573,6 +1023,16 @@ class AutoTradeBot:
 
             self.send_order(f'exit_{trade["action"]}', current_price, trade['size'], 100)
             self.save_trades()
+
+            pnl_percent = (trade['pnl'] / (trade['entry_price'] * trade['size'] / LEVERAGE)) * 100
+            self.send_telegram_message(
+                f"🔴 *CLOSED {trade['action'].upper()} POSITION*\n"
+                f"Entry: `${trade['entry_price']:.2f}`\n"
+                f"Exit: `${current_price:.2f}`\n"
+                f"PNL: `${trade['pnl']:.2f}` ({pnl_percent:+.2f}%)\n"
+                f"Reason: `{reason}`",
+                chat_id
+            )
             
             print(f"[TRADE] 🔴 Closed {trade['action'].upper()} position | "
                   f"Entry: ${trade['entry_price']:.2f} | "
@@ -580,23 +1040,25 @@ class AutoTradeBot:
                   f"PNL: ${trade['pnl']:.4f} (Fee: ${trade['fee']:.4f}) | "
                   f"Reason: {reason}")
 
-    def close_position(self, direction, reason="signal"):
+    def close_position(self, direction, reason="signal", chat_id=None):
         if direction == 'long' and self.current_long_position:
             position = self.current_long_position
         elif direction == 'short' and self.current_short_position:
             position = self.current_short_position
         else:
             print(f"[TRADE] No open {direction.upper()} positions to close 🤷‍♂️")
+            self.send_telegram_message(f"❌ No open {direction.upper()} position to close", chat_id)
             return
             
         current_price = self.get_current_price()
         if current_price is None:
             print("[TRADE] Failed to fetch current price for closing positions")
+            self.send_telegram_message("❌ Failed to fetch price for closing position", chat_id)
             return
 
-        self.close_trade(position, current_price, reason)
+        self.close_trade(position, current_price, reason, chat_id)
 
-    def close_half_position(self, direction):
+    def close_half_position(self, direction, chat_id=None):
         """Manually close half of the position"""
         if direction == 'long' and self.current_long_position:
             position = self.current_long_position
@@ -615,7 +1077,7 @@ class AutoTradeBot:
             print("[HALF EXIT] Failed to fetch current price")
             return
 
-        self.execute_half_exit(position, current_price)
+        self.execute_half_exit(position, current_price, chat_id)
 
     # ========== Risk Management ==========
     def monitor_positions(self):
@@ -647,6 +1109,11 @@ class AutoTradeBot:
             position = self.current_long_position
             if current_price <= position['stop_loss']:
                 print(f"[RISK] Stop loss hit for LONG: ${current_price:.2f} <= ${position['stop_loss']:.2f}")
+                self.send_telegram_message(
+                    f"🛑 *STOP LOSS HIT - LONG*\n"
+                    f"Price: `${current_price:.2f}`\n"
+                    f"Stop Loss: `${position['stop_loss']:.2f}`"
+                )
                 self.close_trade(position, current_price, "stop_loss")
                 return
 
@@ -655,6 +1122,11 @@ class AutoTradeBot:
             position = self.current_short_position
             if current_price >= position['stop_loss']:
                 print(f"[RISK] Stop loss hit for SHORT: ${current_price:.2f} >= ${position['stop_loss']:.2f}")
+                self.send_telegram_message(
+                    f"🛑 *STOP LOSS HIT - SHORT*\n"
+                    f"Price: `${current_price:.2f}`\n"
+                    f"Stop Loss: `${position['stop_loss']:.2f}`"
+                )
                 self.close_trade(position, current_price, "stop_loss")
                 return
 
@@ -741,46 +1213,6 @@ class AutoTradeBot:
         except Exception as e:
             print(f"[DATA] Error saving trades: {e}")
 
-    # ========== Command Interface ==========
-    def listen_for_input(self):
-        print('Bot is running... Type "help" for commands')
-        while self.running:
-            try:
-                cmd = input(">> ").lower().strip()
-
-                if cmd == 'help':
-                    print("Commands: force open long/short, force close long/short, "
-                          "force half close long/short, balance, positions, price, status, exit")
-                
-                elif cmd == 'force open long':
-                    self.open_position('long')
-                elif cmd == 'force open short':
-                    self.open_position('short')
-                elif cmd == 'force close long':
-                    self.close_position('long')
-                elif cmd == 'force close short':
-                    self.close_position('short')
-                elif cmd == 'force half close long':
-                    self.close_half_position('long')
-                elif cmd == 'force half close short':
-                    self.close_half_position('short')
-                elif cmd == 'balance':
-                    print(f"Current balance: ${self.balance:.2f}")
-                elif cmd == 'price':
-                    print(f"Current price: ${self.get_current_price():.2f}")
-                elif cmd == 'exit':
-                    self.running = False
-                    print("Shutting down...")
-                    break
-                else:
-                    print("Invalid command. Type 'help' for available commands")
-            except KeyboardInterrupt:
-                self.running = False
-                print("Shutting down...")
-                break
-            except Exception as e:
-                print(f"Input error: {e}")
-
     def wait_until_next_hour_plus_5sec(self):
         now = datetime.now(timezone.utc)
         current_hour = now.replace(minute=0, second=0, microsecond=0)
@@ -807,6 +1239,30 @@ class AutoTradeBot:
                 print(f"[STRATEGY] Error in strategy loop: {e}")
                 time.sleep(60)
 
+def main():
+    """Main function to start the bot"""
+    # Create trading bot instance first
+    trading_bot = AutoTradeBot()
+    
+    # Create Telegram application
+    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    
+    # Set the telegram app in trading bot
+    trading_bot.set_telegram_app(application)
+    
+    # Add handlers
+    application.add_handler(CommandHandler("start", trading_bot.handle_start))
+    application.add_handler(CommandHandler("help", trading_bot.handle_help))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, trading_bot.handle_message))
+    
+    # Start the bot
+    print("🤖 Starting Trading Bot with Telegram control...")
+    print("✅ Trading strategies are running in background")
+    print("✅ Telegram bot is ready for commands")
+    print("✅ Bot is OPEN TO ALL USERS - no authentication required")
+    print("✅ Send /start to your bot to begin")
+    
+    application.run_polling()
+
 if __name__ == "__main__":
-    bot = AutoTradeBot()
-    bot.listen_for_input()
+    main()
