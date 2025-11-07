@@ -220,11 +220,11 @@ class AutoTradeBot:
         indicators_info = f"""
 📊 Current Indicators:
 • Price: {price_msg}
-• ATR: {self.current_atr_value:.4f}
+• ATR: {self.current_atr_value:.2f}
 • Volume Osc: {self.current_vol_os:.2f}%
 • RSI: {self.current_rsi_value:.2f}
-• FS: {self.fs[-1] if self.fs else 0:.4f}
-• TR: {self.tr[-1] if self.tr else 0:.4f}
+• FS: {self.fs[-1] if self.fs else 0:.2f}
+• TR: {self.tr[-1] if self.tr else 0:.2f}
         """
         
         # Performance
@@ -263,7 +263,7 @@ class AutoTradeBot:
 • Entry: `${trade['entry_price']:.2f}`
 • Exit: `${trade['exit_price']:.2f}`
 • PNL: `${trade['pnl']:.2f}` ({pnl_percent:+.2f}%)
-• Size: `{trade['size']:.4f}`
+• Size: `{trade['size']:.2f}`
 • Reason: `{trade['reason']}`
 • Date: `{trade['exit_time'][:19]} UTC`
 ────────────────────
@@ -465,7 +465,7 @@ Use the buttons below to control the bot or type /help for more information.
                 positions_msg += f"""
 📈 *LONG Position:*
 • Entry Price: `${pos['entry_price']:.2f}`
-• Size: `{pos['size']:.4f}`
+• Size: `{pos['size']:.2f}`
 • Stop Loss: `${pos['stop_loss']:.2f}`
 • Take Profit: `${pos['take_profit']:.2f}`
 • Unrealized PNL: `${unrealized_pnl:.2f}`
@@ -480,7 +480,7 @@ Use the buttons below to control the bot or type /help for more information.
                 positions_msg += f"""
 📉 *SHORT Position:*
 • Entry Price: `${pos['entry_price']:.2f}`
-• Size: `{pos['size']:.4f}`
+• Size: `{pos['size']:.2f}`
 • Stop Loss: `${pos['stop_loss']:.2f}`
 • Take Profit: `${pos['take_profit']:.2f}`
 • Unrealized PNL: `${unrealized_pnl:.2f}`
@@ -601,7 +601,7 @@ Use the buttons below to control the bot or type /help for more information.
                 if ticker['symbol'] == ETHUSDT_SYMBOL:
                     price = float(ticker['lastPr'])
                     print(f"[REST] Fetched price: ${price:.2f}")
-                    return price
+                    return round(price, 2)
                     
             print(f"[REST] ETHUSDT symbol not found in response")
             return None
@@ -775,7 +775,7 @@ Use the buttons below to control the bot or type /help for more information.
             if 'original_size' not in position:
                 position['original_size'] = position['size']
 
-            half_size = position['size'] / 2
+            half_size = round(position['size'] / 2, 2)
             remaining_size = position['size'] - half_size
 
             if position['action'] == 'long':
@@ -818,17 +818,17 @@ Use the buttons below to control the bot or type /help for more information.
 
             self.send_telegram_message(f"[HALF EXIT] 🔵 Executed half exit for {position['action'].upper()} position | "
                   f"Exit Price: ${current_price:.2f} | "
-                  f"Half Size: {half_size:.4f} | "
-                  f"Remaining Size: {remaining_size:.4f} | "
-                  f"PNL: ${net_pnl:.4f}",
+                  f"Half Size: {half_size:.2f} | "
+                  f"Remaining Size: {remaining_size:.2f} | "
+                  f"PNL: ${net_pnl:.2f}",
                   chat_id
                   )
             
             print(f"[HALF EXIT] 🔵 Executed half exit for {position['action'].upper()} position | "
                   f"Exit Price: ${current_price:.2f} | "
-                  f"Half Size: {half_size:.4f} | "
-                  f"Remaining Size: {remaining_size:.4f} | "
-                  f"PNL: ${net_pnl:.4f}")
+                  f"Half Size: {half_size:.2f} | "
+                  f"Remaining Size: {remaining_size:.2f} | "
+                  f"PNL: ${net_pnl:.2f}")
 
             self.save_trades()
 
@@ -854,9 +854,9 @@ Use the buttons below to control the bot or type /help for more information.
         self.current_atr_value = df['atr'].iloc[-1]
         self.current_rsi_value = df['rsi'].iloc[-1]
 
-        print(f"[INDICATORS] Updated FS: {self.fs[-1]:.4f}, TR: {self.tr[-1]:.4f}, "
-            f"VOL_OS: {self.current_vol_os:.4f}, ATR_VAL: {self.current_atr_value:.4f}, "
-            f"RSI_VALUE: {self.current_rsi_value:.4f}")
+        print(f"[INDICATORS] Updated FS: {self.fs[-1]:.2f}, TR: {self.tr[-1]:.2f}, "
+            f"VOL_OS: {self.current_vol_os:.2f}, ATR_VAL: {self.current_atr_value:.2f}, "
+            f"RSI_VALUE: {self.current_rsi_value:.2f}")
 
     # ========== Trading Logic ==========
     def check_signal(self, current_time: str):
@@ -866,11 +866,11 @@ Use the buttons below to control the bot or type /help for more information.
         
         fs_now = self.fs[-1]
         tr_now = self.tr[-1]
-        print(f"[{current_time}] 1H indicator values now fs:{fs_now:.4f}, tr:{tr_now:.4f}")
+        print(f"[{current_time}] 1H indicator values now fs:{fs_now:.2f}, tr:{tr_now:.2f}")
         
         fs_prev = self.fs[-2]
         tr_prev = self.tr[-2]
-        print(f"[{current_time}] 1H indicator values prev fs:{fs_prev:.4f}, tr:{tr_prev:.4f}")
+        print(f"[{current_time}] 1H indicator values prev fs:{fs_prev:.2f}, tr:{tr_prev:.2f}")
 
         fs_cross_up = (fs_prev < tr_prev) and (fs_now > tr_now)
         fs_cross_down = (fs_prev > tr_prev) and (fs_now < tr_now)
@@ -944,7 +944,7 @@ Use the buttons below to control the bot or type /help for more information.
             
             available = self.fetch_real_balance()
             
-            size = round((available * POSITION_SIZE_RATIO * LEVERAGE) / price, 3)
+            size = round((available * POSITION_SIZE_RATIO * LEVERAGE) / price, 2)
 
             current_time = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
@@ -991,13 +991,13 @@ Use the buttons below to control the bot or type /help for more information.
             self.send_telegram_message(
                 f"✅ *OPENED {direction.upper()} POSITION*\n"
                 f"Price: `${price:.2f}`\n"
-                f"Size: `{size:.4f}`\n"
+                f"Size: `{size:.2f}`\n"
                 f"SL: `${stop_loss:.2f}`\n"
                 f"TP: `${take_profit:.2f}`\n"
                 f"Leverage: `{LEVERAGE}x`",
                 chat_id
             )
-            print(f"[TRADE] 🟢 Opened {direction.upper()} position at ${price:.2f}, size: {size:.4f}, SL: ${stop_loss:.2f}")
+            print(f"[TRADE] 🟢 Opened {direction.upper()} position at ${price:.2f}, size: {size:.2f}, SL: ${stop_loss:.2f}")
 
     def close_trade(self, trade, current_price, reason, chat_id=None):
         with self.trade_lock:
@@ -1037,7 +1037,7 @@ Use the buttons below to control the bot or type /help for more information.
             print(f"[TRADE] 🔴 Closed {trade['action'].upper()} position | "
                   f"Entry: ${trade['entry_price']:.2f} | "
                   f"Exit: ${current_price:.2f} | "
-                  f"PNL: ${trade['pnl']:.4f} (Fee: ${trade['fee']:.4f}) | "
+                  f"PNL: ${trade['pnl']:.2f} (Fee: ${trade['fee']:.2f}) | "
                   f"Reason: {reason}")
 
     def close_position(self, direction, reason="signal", chat_id=None):
