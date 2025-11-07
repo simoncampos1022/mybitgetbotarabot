@@ -1104,7 +1104,7 @@ Use the buttons below to control the bot or type /help for more information.
                 "productType": PRODUCT_TYPE,
                 "marginMode" : MARGIN_MODE,
                 "marginCoin": MARGIN_COIN,
-                "size": str(round(size, 4)) if size else "",
+                "size": str(round(size, 2)) if size else "",
                 "side": side,
                 "tradeSide": "open",
                 "orderType": self.orderType,
@@ -1121,7 +1121,7 @@ Use the buttons below to control the bot or type /help for more information.
                 "productType": PRODUCT_TYPE,
                 "marginMode" : MARGIN_MODE,
                 "marginCoin": MARGIN_COIN,
-                "size": str(round(size, 4)) if size else "",
+                "size": str(round(size, 2)) if size else "",
                 "side": side,
                 "tradeSide": "close",
                 "orderType": self.orderType,
@@ -1161,7 +1161,7 @@ Use the buttons below to control the bot or type /help for more information.
                         trade['action'],
                         round(trade['entry_price'], 2),
                         round(trade['exit_price'], 2) if trade['exit_price'] else '',
-                        round(trade['size'], 4),
+                        round(trade['size'], 2),
                         trade['status'],
                         round(trade['fee'], 2),
                         round(trade['ideal_pnl'], 2),
@@ -1172,7 +1172,7 @@ Use the buttons below to control the bot or type /help for more information.
                         round(trade.get('max_profit_price', 0), 2),
                         str(trade.get('trailing_stop_active', False)),
                         str(trade.get('half_exit_done', False)),
-                        round(trade.get('original_size', trade['size']), 4)
+                        round(trade.get('original_size', trade['size']), 2)
                     ])
             print(f"[DATA] Saved {len(self.trades)} trades to {CSV_FILE}")
         except Exception as e:
