@@ -119,8 +119,6 @@ class AutoTradeBot:
         # Start background threads
         threading.Thread(target=self.strategy_loop, daemon=True).start()
         threading.Thread(target=self.monitor_positions, daemon=True).start()
-        threading.Thread(target=self.process_telegram_messages, daemon=True).start()
-
     
     def set_telegram_app(self, app):
         """Set the telegram application after it's created"""
@@ -149,39 +147,6 @@ class AutoTradeBot:
             'message': message,
             'chat_id': chat_id
         })
-
-    def process_telegram_messages(self):
-        """Process Telegram messages from the queue in a separate thread"""
-        while self.running:
-            try:
-                if not self.message_queue.empty():
-                    message_data = self.message_queue.get()
-                    
-                    if self.telegram_app and hasattr(self.telegram_app, 'bot'):
-                        try:
-                            # Create a new event loop for this thread
-                            loop = asyncio.new_event_loop()
-                            asyncio.set_event_loop(loop)
-                            
-                            # Run the async function
-                            loop.run_until_complete(
-                                self.send_telegram_message_async(
-                                    message_data['message'],
-                                    message_data['chat_id']
-                                )
-                            )
-                            loop.close()
-                            
-                        except Exception as e:
-                            print(f"[TELEGRAM QUEUE] Error in event loop: {e}")
-                    
-                    self.message_queue.task_done()
-                
-                time.sleep(0.1)  # Small delay to prevent busy waiting
-                
-            except Exception as e:
-                print(f"[TELEGRAM QUEUE] Error processing message: {e}")
-                time.sleep(1)
 
     async def send_telegram_message_async(self, message, chat_id=None):
         """Async method to send Telegram message"""
