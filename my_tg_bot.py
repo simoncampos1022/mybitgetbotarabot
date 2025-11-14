@@ -32,11 +32,11 @@ ATR_LENGTH = 14
 FS_LENGTH = 10
 RSI_LENGTH = 14
 
-FS_ENTRY_LEVEL = 1.7
-RSI_ENTRY_LEVEL = 1.0
+FS_ENTRY_LEVEL = 0.4
+RSI_ENTRY_LEVEL = 6.0
 STOP_LOSS_LEVEL = 2.0
-TAKE_PROFIT_LEVEL = 1.0
-SECOND_SL_LEVEL = 1.7
+TAKE_PROFIT_LEVEL = 0.9
+SECOND_SL_LEVEL = 2.9
 
 class AutoTradeBot:
     def __init__(self):
@@ -851,17 +851,14 @@ Use the buttons below to control the bot or type /help for more information.
             print(f"DOWN cross is detected!")
         
         if fs_cross_up:
-            cond_entry = abs(self.current_rsi_value - 50) > RSI_ENTRY_LEVEL
-            cond_entry_fs = max(abs(tr_now), abs(fs_now)) < FS_ENTRY_LEVEL
+            cond_entry = abs(self.current_rsi_value - 50) < RSI_ENTRY_LEVEL
+            cond_entry_fs = max(abs(tr_now), abs(fs_now)) > FS_ENTRY_LEVEL
             cond_vol = self.current_vol_os > 0
             
             print(f"[SIGNAL] LONG Conditions - RSI: {cond_entry}, FS: {cond_entry_fs}, VOL: {cond_vol}")
             
             if cond_entry and cond_entry_fs and cond_vol:
-                if self.current_short_position:
-                    self.close_position('short', "Replace by long")
-                    self.open_position('long')
-                elif self.current_long_position:
+                if self.current_long_position:
                     if current_price < self.current_long_position['entry_price']:
                         self.close_position('long', "Replace")
                         self.open_position('long')
@@ -872,16 +869,13 @@ Use the buttons below to control the bot or type /help for more information.
                     
         elif fs_cross_down:
             cond_entry = abs(self.current_rsi_value - 50) > RSI_ENTRY_LEVEL
-            cond_entry_fs = max(abs(tr_now), abs(fs_now)) < FS_ENTRY_LEVEL
-            cond_vol = self.current_vol_os > 0
+            cond_entry_fs = max(abs(tr_now), abs(fs_now)) > FS_ENTRY_LEVEL
+            cond_vol = self.current_vol_os < 0
             
             print(f"[SIGNAL] SHORT Conditions - RSI: {cond_entry}, FS: {cond_entry_fs}, VOL: {cond_vol}")
             
             if cond_entry and cond_entry_fs and cond_vol:
-                if self.current_long_position:
-                    self.close_position('long', "Replace by short")
-                    self.open_position('short')
-                elif self.current_short_position:
+                if self.current_short_position:
                     if current_price > self.current_short_position['entry_price']:
                         self.close_position('short', "Replace")
                         self.open_position('short')
@@ -919,9 +913,17 @@ Use the buttons below to control the bot or type /help for more information.
             if direction == 'long':
                 stop_loss = price - initial_risk
                 take_profit = price + initial_profit 
-            else:  # short
+
+                max_stop_loss = price * ( LEVERAGE - 0.22 ) / LEVERAGE
+                if stop_loss < max_stop_loss:
+                    stop_loss = max_stop_loss 
+            else:
                 stop_loss = price + initial_risk
-                take_profit = price - initial_profit 
+                take_profit = price - initial_profit
+
+                max_stop_loss = price * ( LEVERAGE + 0.22 ) / LEVERAGE
+                if stop_loss > max_stop_loss:
+                    stop_loss = max_stop_loss 
 
             trade = {
                 'entry_time': current_time,
