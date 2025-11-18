@@ -24,7 +24,7 @@ CSV_FILE = "my_bitget_eth_history.csv"
 
 TELEGRAM_BOT_TOKEN = "8450626645:AAFA13SAXi461H56dDqRjbh-ZyE8IGuguIo"
 
-LEVERAGE = 10
+LEVERAGE = 5
 POSITION_SIZE_RATIO = 0.4
 INTERVAL = "1H"
 FEE_PERCENT = 0.0006
@@ -32,11 +32,17 @@ ATR_LENGTH = 14
 FS_LENGTH = 10
 RSI_LENGTH = 14
 
-FS_ENTRY_LEVEL = 0.4
-RSI_ENTRY_LEVEL = 6.0
-STOP_LOSS_LEVEL = 2.0
-TAKE_PROFIT_LEVEL = 0.9
-SECOND_SL_LEVEL = 2.9
+LONG_FS_ENTRY_LEVEL = 0.3
+LONG_RSI_ENTRY_LEVEL = 13.0
+LONG_STOP_LOSS_LEVEL = 2.6
+LONG_TAKE_PROFIT_LEVEL = 2.9
+LONG_SECOND_SL_LEVEL = 0.1
+
+SHORT_FS_ENTRY_LEVEL = 4.2
+SHORT_RSI_ENTRY_LEVEL = 26.0
+SHORT_STOP_LOSS_LEVEL = 1.7
+SHORT_TAKE_PROFIT_LEVEL = 0.2
+SHORT_SECOND_SL_LEVEL = 0.1
 
 class AutoTradeBot:
     def __init__(self):
@@ -703,7 +709,7 @@ Use the buttons below to control the bot or type /help for more information.
                 changed = True
 
             if position['trailing_stop_active']:
-                trailing_stop_price = position['max_profit_price'] - (self.current_atr_value * SECOND_SL_LEVEL)
+                trailing_stop_price = position['max_profit_price'] - (self.current_atr_value * LONG_SECOND_SL_LEVEL)
                 if trailing_stop_price > position['stop_loss']:
                     position['stop_loss'] = trailing_stop_price
                     changed = True
@@ -721,7 +727,7 @@ Use the buttons below to control the bot or type /help for more information.
                 changed = True
 
             if position['trailing_stop_active']:
-                trailing_stop_price = position['max_profit_price'] + (self.current_atr_value * SECOND_SL_LEVEL)
+                trailing_stop_price = position['max_profit_price'] + (self.current_atr_value * SHORT_SECOND_SL_LEVEL)
                 if trailing_stop_price < position['stop_loss']:
                     position['stop_loss'] = trailing_stop_price
                     changed = True
@@ -851,8 +857,8 @@ Use the buttons below to control the bot or type /help for more information.
             print(f"DOWN cross is detected!")
         
         if fs_cross_up:
-            cond_entry = abs(self.current_rsi_value - 50) < RSI_ENTRY_LEVEL
-            cond_entry_fs = max(abs(tr_now), abs(fs_now)) > FS_ENTRY_LEVEL
+            cond_entry = abs(self.current_rsi_value - 50) > LONG_RSI_ENTRY_LEVEL
+            cond_entry_fs = max(abs(tr_now), abs(fs_now)) > LONG_FS_ENTRY_LEVEL
             cond_vol = self.current_vol_os > 0
             
             print(f"[SIGNAL] LONG Conditions - RSI: {cond_entry}, FS: {cond_entry_fs}, VOL: {cond_vol}")
@@ -868,9 +874,9 @@ Use the buttons below to control the bot or type /help for more information.
                     self.open_position('long')
                     
         elif fs_cross_down:
-            cond_entry = abs(self.current_rsi_value - 50) > RSI_ENTRY_LEVEL
-            cond_entry_fs = max(abs(tr_now), abs(fs_now)) > FS_ENTRY_LEVEL
-            cond_vol = self.current_vol_os < 0
+            cond_entry = abs(self.current_rsi_value - 50) < SHORT_RSI_ENTRY_LEVEL
+            cond_entry_fs = max(abs(tr_now), abs(fs_now)) < SHORT_FS_ENTRY_LEVEL
+            cond_vol = self.current_vol_os > 0
             
             print(f"[SIGNAL] SHORT Conditions - RSI: {cond_entry}, FS: {cond_entry_fs}, VOL: {cond_vol}")
             
@@ -907,23 +913,23 @@ Use the buttons below to control the bot or type /help for more information.
 
             current_time = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
-            initial_risk = self.current_atr_value * STOP_LOSS_LEVEL
-            initial_profit = self.current_atr_value * TAKE_PROFIT_LEVEL * STOP_LOSS_LEVEL
+            if direction == 'long':
+                stop_loss_level = LONG_STOP_LOSS_LEVEL
+                take_profit_level = LONG_TAKE_PROFIT_LEVEL
+            else:
+                stop_loss_level = SHORT_STOP_LOSS_LEVEL
+                take_profit_level = SHORT_TAKE_PROFIT_LEVEL
+            
+            initial_risk = self.current_atr_value * stop_loss_level
+            initial_profit = self.current_atr_value * take_profit_level
 
             if direction == 'long':
                 stop_loss = price - initial_risk
                 take_profit = price + initial_profit 
 
-                max_stop_loss = price * ( LEVERAGE - 0.22 ) / LEVERAGE
-                if stop_loss < max_stop_loss:
-                    stop_loss = max_stop_loss 
             else:
                 stop_loss = price + initial_risk
                 take_profit = price - initial_profit
-
-                max_stop_loss = price * ( LEVERAGE + 0.22 ) / LEVERAGE
-                if stop_loss > max_stop_loss:
-                    stop_loss = max_stop_loss 
 
             trade = {
                 'entry_time': current_time,
