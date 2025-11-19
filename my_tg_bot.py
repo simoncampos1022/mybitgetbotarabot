@@ -16,11 +16,11 @@ from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 import asyncio
 
-ETHUSDT_SYMBOL = "ETHUSDT"
+HYPEUSDT_SYMBOL = "HYPEUSDT"
 PRODUCT_TYPE = "USDT-FUTURES"
 MARGIN_COIN = "USDT"
 MARGIN_MODE = "isolated"
-CSV_FILE = "my_bitget_eth_history.csv"
+CSV_FILE = "my_bitget_hype_history.csv"
 
 TELEGRAM_BOT_TOKEN = "8450626645:AAFA13SAXi461H56dDqRjbh-ZyE8IGuguIo"
 
@@ -32,15 +32,15 @@ ATR_LENGTH = 14
 FS_LENGTH = 10
 RSI_LENGTH = 14
 
-LONG_FS_ENTRY_LEVEL = 0.3
-LONG_RSI_ENTRY_LEVEL = 13.0
-LONG_STOP_LOSS_LEVEL = 2.6
-LONG_TAKE_PROFIT_LEVEL = 2.9
+LONG_FS_ENTRY_LEVEL = 2.3
+LONG_RSI_ENTRY_LEVEL = 11.0
+LONG_STOP_LOSS_LEVEL = 2.8
+LONG_TAKE_PROFIT_LEVEL = 0.1
 LONG_SECOND_SL_LEVEL = 0.1
 
-SHORT_FS_ENTRY_LEVEL = 4.2
-SHORT_RSI_ENTRY_LEVEL = 26.0
-SHORT_STOP_LOSS_LEVEL = 1.7
+SHORT_FS_ENTRY_LEVEL = 0.4
+SHORT_RSI_ENTRY_LEVEL = 2.0
+SHORT_STOP_LOSS_LEVEL = 2.8
 SHORT_TAKE_PROFIT_LEVEL = 0.2
 SHORT_SECOND_SL_LEVEL = 0.1
 
@@ -539,10 +539,10 @@ Use the buttons below to control the bot or type /help for more information.
             return None
 
     def set_leverage(self, leverage=10):
-        """Set leverage for ETHUSDT USDT-FUTURES"""
+        """Set leverage for HYPEUSDT USDT-FUTURES"""
         try:
             params = {
-                "symbol": ETHUSDT_SYMBOL,
+                "symbol": HYPEUSDT_SYMBOL,
                 "productType": PRODUCT_TYPE,
                 "marginCoin": MARGIN_COIN,
                 "leverage": str(leverage)
@@ -559,7 +559,7 @@ Use the buttons below to control the bot or type /help for more information.
     def get_current_price(self):
         try:
             params = {
-                "symbol": ETHUSDT_SYMBOL,
+                "symbol": HYPEUSDT_SYMBOL,
                 "productType": PRODUCT_TYPE,
             }
             response = self.maxMarketApi.tickers(params)
@@ -569,12 +569,12 @@ Use the buttons below to control the bot or type /help for more information.
                 return None
                 
             for ticker in response['data']:
-                if ticker['symbol'] == ETHUSDT_SYMBOL:
+                if ticker['symbol'] == HYPEUSDT_SYMBOL:
                     price = float(ticker['lastPr'])
                     print(f"[REST] Fetched price: ${price:.2f}")
                     return round(price, 2)
                     
-            print(f"[REST] ETHUSDT symbol not found in response")
+            print(f"[REST] HYPEUSDT symbol not found in response")
             return None
             
         except Exception as e:
@@ -584,7 +584,7 @@ Use the buttons below to control the bot or type /help for more information.
     def fetch_candles(self, interval: str, limit: int):
         
         params = {
-            "symbol": ETHUSDT_SYMBOL,
+            "symbol": HYPEUSDT_SYMBOL,
             "productType": PRODUCT_TYPE,
             "granularity": interval,
             "limit": limit
@@ -857,9 +857,9 @@ Use the buttons below to control the bot or type /help for more information.
             print(f"DOWN cross is detected!")
         
         if fs_cross_up:
-            cond_entry = abs(self.current_rsi_value - 50) > LONG_RSI_ENTRY_LEVEL
-            cond_entry_fs = max(abs(tr_now), abs(fs_now)) > LONG_FS_ENTRY_LEVEL
-            cond_vol = self.current_vol_os > 0
+            cond_entry = abs(self.current_rsi_value - 50) < LONG_RSI_ENTRY_LEVEL
+            cond_entry_fs = max(abs(tr_now), abs(fs_now)) < LONG_FS_ENTRY_LEVEL
+            cond_vol = self.current_vol_os < 0
             
             print(f"[SIGNAL] LONG Conditions - RSI: {cond_entry}, FS: {cond_entry_fs}, VOL: {cond_vol}")
             
@@ -874,8 +874,8 @@ Use the buttons below to control the bot or type /help for more information.
                     self.open_position('long')
                     
         elif fs_cross_down:
-            cond_entry = abs(self.current_rsi_value - 50) < SHORT_RSI_ENTRY_LEVEL
-            cond_entry_fs = max(abs(tr_now), abs(fs_now)) < SHORT_FS_ENTRY_LEVEL
+            cond_entry = abs(self.current_rsi_value - 50) > SHORT_RSI_ENTRY_LEVEL
+            cond_entry_fs = max(abs(tr_now), abs(fs_now)) > SHORT_FS_ENTRY_LEVEL
             cond_vol = self.current_vol_os > 0
             
             print(f"[SIGNAL] SHORT Conditions - RSI: {cond_entry}, FS: {cond_entry_fs}, VOL: {cond_vol}")
@@ -1108,7 +1108,7 @@ Use the buttons below to control the bot or type /help for more information.
         if action in ["short", "long"]:
             side = "sell" if action == "short" else "buy"
             params = {
-                "symbol": ETHUSDT_SYMBOL,
+                "symbol": HYPEUSDT_SYMBOL,
                 "productType": PRODUCT_TYPE,
                 "marginMode" : MARGIN_MODE,
                 "marginCoin": MARGIN_COIN,
@@ -1125,7 +1125,7 @@ Use the buttons below to control the bot or type /help for more information.
         elif action in ["exit_short", "exit_long"]:
             side = "buy" if action == "exit_long" else "sell"
             params = {
-                "symbol": ETHUSDT_SYMBOL,
+                "symbol": HYPEUSDT_SYMBOL,
                 "productType": PRODUCT_TYPE,
                 "marginMode" : MARGIN_MODE,
                 "marginCoin": MARGIN_COIN,
