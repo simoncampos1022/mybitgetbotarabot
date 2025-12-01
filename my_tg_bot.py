@@ -228,7 +228,7 @@ class AutoTradeBot:
         # Start background threads
         threading.Thread(target=self.strategy_loop, daemon=True).start()
         threading.Thread(target=self.monitor_positions, daemon=True).start()
-        threading.Thread(target=self.process_message_queue, daemon=True).start()
+        # threading.Thread(target=self.process_message_queue, daemon=True).start()
     
     def set_telegram_app(self, app):
         """Set the telegram application after it's created"""
@@ -276,54 +276,54 @@ class AutoTradeBot:
             'chat_id': authorized_chat_id
         })
     
-    def process_message_queue(self):
-        """Background thread to process message queue and send Telegram messages"""
-        print("[TELEGRAM] Starting message queue processor...")
-        # Create a new event loop for this thread
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+    # def process_message_queue(self):
+    #     """Background thread to process message queue and send Telegram messages"""
+    #     print("[TELEGRAM] Starting message queue processor...")
+    #     # Create a new event loop for this thread
+    #     loop = asyncio.new_event_loop()
+    #     asyncio.set_event_loop(loop)
         
-        while self.running:
-            try:
-                # Wait for a message in the queue (with timeout to check if still running)
-                try:
-                    msg_data = self.message_queue.get(timeout=1)
-                except:
-                    continue  # Timeout, check if still running
+    #     while self.running:
+    #         try:
+    #             # Wait for a message in the queue (with timeout to check if still running)
+    #             try:
+    #                 msg_data = self.message_queue.get(timeout=1)
+    #             except:
+    #                 continue  # Timeout, check if still running
                 
-                if not self.telegram_app:
-                    print(f"[TELEGRAM] App not initialized, skipping message")
-                    continue
+    #             if not self.telegram_app:
+    #                 print(f"[TELEGRAM] App not initialized, skipping message")
+    #                 continue
                 
-                message = msg_data['message']
-                chat_id = msg_data['chat_id']
+    #             message = msg_data['message']
+    #             chat_id = msg_data['chat_id']
                 
-                # Send the message using the thread's event loop
-                try:
-                    loop.run_until_complete(self.send_telegram_message_async(message, chat_id))
-                except Exception as e:
-                    print(f"[TELEGRAM] Error sending message: {e}")
+    #             # Send the message using the thread's event loop
+    #             try:
+    #                 loop.run_until_complete(self.send_telegram_message_async(message, chat_id))
+    #             except Exception as e:
+    #                 print(f"[TELEGRAM] Error sending message: {e}")
                     
-            except Exception as e:
-                print(f"[TELEGRAM] Error in message queue processor: {e}")
-                time.sleep(1)
+    #         except Exception as e:
+    #             print(f"[TELEGRAM] Error in message queue processor: {e}")
+    #             time.sleep(1)
         
-        loop.close()
+    #     loop.close()
 
-    async def send_telegram_message_async(self, message, chat_id=AUTHORIZED_CHAT_ID):
-        """Async method to send Telegram message - always uses authorized chat_id"""
-        try:
-            # Always use authorized chat_id for security
-            authorized_chat_id = AUTHORIZED_CHAT_ID
-            await self.telegram_app.bot.send_message(
-                chat_id=authorized_chat_id,
-                text=message,
-                reply_markup=self.get_main_keyboard(),
-                parse_mode='Markdown'
-            )
-            print(f"[TELEGRAM] Message sent to authorized chat {authorized_chat_id}")
-        except Exception as e:
-            print(f"[TELEGRAM ASYNC] Error sending message: {e}")
+    # async def send_telegram_message_async(self, message, chat_id=AUTHORIZED_CHAT_ID):
+    #     """Async method to send Telegram message - always uses authorized chat_id"""
+    #     try:
+    #         # Always use authorized chat_id for security
+    #         authorized_chat_id = AUTHORIZED_CHAT_ID
+    #         await self.telegram_app.bot.send_message(
+    #             chat_id=authorized_chat_id,
+    #             text=message,
+    #             reply_markup=self.get_main_keyboard(),
+    #             parse_mode='Markdown'
+    #         )
+    #         print(f"[TELEGRAM] Message sent to authorized chat {authorized_chat_id}")
+    #     except Exception as e:
+    #         print(f"[TELEGRAM ASYNC] Error sending message: {e}")
     
     def is_authorized(self, chat_id):
         """Check if the chat_id is authorized"""
