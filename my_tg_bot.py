@@ -25,7 +25,6 @@ TELEGRAM_BOT_TOKEN = "8321838467:AAG4s4t8C0Wux71TIq-Dx86NsC0wk3uE6E8"
 AUTHORIZED_CHAT_ID = "7839829083"  # Only this chat ID can use the bot
 
 LEVERAGE = 5
-POSITION_SIZE_RATIO = 0.2
 INTERVAL = "1H"
 FEE_PERCENT = 0.0006
 ATR_LENGTH = 14
@@ -1323,13 +1322,12 @@ Use the buttons below to control the bot or type /help for more information.
                 print(f"[TRADE] {symbol} Failed to fetch current price for open position.")
                 self.send_telegram_message(f"❌ {symbol} Failed to fetch price for opening position")
                 return
-            
+
+            self.balance = self.fetch_real_balance()
             # Only update balance if there are no open positions
             # If there are open positions, use the existing balance
-            if total_open_positions == 0:
-                self.balance = self.fetch_real_balance()
-            
-            size = round((self.balance * POSITION_SIZE_RATIO * LEVERAGE) / price, 2)
+
+            size = round((self.balance * (1.0/(5-total_open_positions)) * LEVERAGE) / price, 2)
 
             current_time = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
