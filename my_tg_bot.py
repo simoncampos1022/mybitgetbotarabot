@@ -261,7 +261,7 @@ class AutoTradeBot:
         return InlineKeyboardMarkup(keyboard)
 
     # ========== Telegram Message System ==========
-    def send_telegram_message(self, message, chat_id=None):
+    def send_telegram_message(self, message):
         """Queue a message to be sent via Telegram - always uses authorized chat_id"""
         if not self.telegram_app:
             print(f"[TELEGRAM] App not initialized: {message}")
@@ -275,7 +275,7 @@ class AutoTradeBot:
             'chat_id': authorized_chat_id
         })
 
-    async def send_telegram_message_async(self, message, chat_id=None):
+    async def send_telegram_message_async(self, message, chat_id=AUTHORIZED_CHAT_ID):
         """Async method to send Telegram message - always uses authorized chat_id"""
         try:
             # Always use authorized chat_id for security
@@ -571,7 +571,7 @@ Use the buttons below to control the bot or type /help for more information.
                     f"🔄 Closing {open_symbols[0]} LONG position...",
                     reply_markup=self.get_main_keyboard()
                 )
-                self.close_position('long', "manual_close", chat_id, open_symbols[0])
+                self.close_position('long', "manual_close", open_symbols[0])
             else:
                 # Multiple positions, show selection - only show symbols with open positions
                 await update.message.reply_text(
@@ -598,7 +598,7 @@ Use the buttons below to control the bot or type /help for more information.
                     f"🔄 Closing {open_symbols[0]} SHORT position...",
                     reply_markup=self.get_main_keyboard()
                 )
-                self.close_position('short', "manual_close", chat_id, open_symbols[0])
+                self.close_position('short', "manual_close", open_symbols[0])
             else:
                 # Multiple positions, show selection - only show symbols with open positions
                 await update.message.reply_text(
@@ -689,7 +689,7 @@ Use the buttons below to control the bot or type /help for more information.
                     f"Halving {open_symbols[0]} LONG position…",
                     reply_markup=self.get_main_keyboard()
                 )
-                self.close_half_position('long', chat_id, open_symbols[0])
+                self.close_half_position('long', open_symbols[0])
             else:
                 # Multiple positions, show selection - only show symbols with open positions
                 await update.message.reply_text(
@@ -715,7 +715,7 @@ Use the buttons below to control the bot or type /help for more information.
                     f"Halving {open_symbols[0]} SHORT position…",
                     reply_markup=self.get_main_keyboard()
                 )
-                self.close_half_position('short', chat_id, open_symbols[0])
+                self.close_half_position('short', open_symbols[0])
             else:
                 # Multiple positions, show selection - only show symbols with open positions
                 await update.message.reply_text(
@@ -770,7 +770,7 @@ Use the buttons below to control the bot or type /help for more information.
                 f"🔄 Opening {symbol} {direction.upper()} position...",
                 reply_markup=None
             )
-            self.open_position(direction, chat_id, symbol)
+            self.open_position(direction, symbol)
             
         elif action == "close":
             # close_long_SYMBOL or close_short_SYMBOL
@@ -779,7 +779,7 @@ Use the buttons below to control the bot or type /help for more information.
                 f"🔄 Closing {symbol} {direction.upper()} position...",
                 reply_markup=None
             )
-            self.close_position(direction, "manual_close", chat_id, symbol)
+            self.close_position(direction, "manual_close", symbol)
             
         elif action == "half":
             # half_close_long_SYMBOL or half_close_short_SYMBOL
@@ -788,7 +788,7 @@ Use the buttons below to control the bot or type /help for more information.
                 f"Halving {symbol} {direction.upper()} position…",
                 reply_markup=None
             )
-            self.close_half_position(direction, chat_id, symbol)
+            self.close_half_position(direction, symbol)
             
         else:
             await query.edit_message_text("❌ Unknown action.", reply_markup=None)
@@ -1026,7 +1026,7 @@ Use the buttons below to control the bot or type /help for more information.
         if changed:
             self.save_trades()
 
-    def execute_half_exit(self, position, current_price, chat_id=None, symbol=None):
+    def execute_half_exit(self, position, current_price, symbol=None):
         """Execute half position exit and update position size"""
         if symbol is None:
             symbol = position.get('symbol', TRADING_SYMBOLS[0])
@@ -1084,8 +1084,7 @@ Use the buttons below to control the bot or type /help for more information.
                   f"Exit Price: ${current_price:.4f} | "
                   f"Half Size: {half_size:.4f} | "
                   f"Remaining Size: {remaining_size:.4f} | "
-                  f"PNL: ${net_pnl:.4f}",
-                  chat_id
+                  f"PNL: ${net_pnl:.4f}"
                   )
             
             print(f"[HALF EXIT] 🔵 {symbol} Executed half exit for {position['action'].upper()} position | "
@@ -1164,11 +1163,9 @@ Use the buttons below to control the bot or type /help for more information.
         
         fs_now = data['fs'][-1]
         tr_now = data['tr'][-1]
-        print(f"[{current_time}] {symbol} 1H indicator values now fs:{fs_now:.4f}, tr:{tr_now:.4f}")
         
         fs_prev = data['fs'][-2]
         tr_prev = data['tr'][-2]
-        print(f"[{current_time}] {symbol} 1H indicator values prev fs:{fs_prev:.4f}, tr:{tr_prev:.4f}")
 
         fs_cross_up = (fs_prev < tr_prev) and (fs_now > tr_now)
         fs_cross_down = (fs_prev > tr_prev) and (fs_now < tr_now)
@@ -1231,7 +1228,7 @@ Use the buttons below to control the bot or type /help for more information.
                 else:
                     self.open_position('short', None, symbol)
 
-    def open_position(self, direction, chat_id=None, symbol=None):
+    def open_position(self, direction, symbol=None):
         if symbol is None:
             symbol = TRADING_SYMBOLS[0]  # Default to first symbol for manual commands
             
@@ -1242,17 +1239,17 @@ Use the buttons below to control the bot or type /help for more information.
             # Check if position already exists for this symbol
             if direction == 'long' and data['long_position']:
                 print(f"[TRADE] {symbol} Cannot open LONG: an open LONG position already exists.")
-                self.send_telegram_message(f"❌ {symbol} Cannot open LONG: Position already exists", chat_id)
+                self.send_telegram_message(f"❌ {symbol} Cannot open LONG: Position already exists")
                 return
             if direction == 'short' and data['short_position']:
                 print(f"[TRADE] {symbol} Cannot open SHORT: an open SHORT position already exists.")
-                self.send_telegram_message(f"❌ {symbol} Cannot open SHORT: Position already exists", chat_id)
+                self.send_telegram_message(f"❌ {symbol} Cannot open SHORT: Position already exists")
                 return
         
             price = self.get_current_price(symbol)
             if price is None:
                 print(f"[TRADE] {symbol} Failed to fetch current price for open position.")
-                self.send_telegram_message(f"❌ {symbol} Failed to fetch price for opening position", chat_id)
+                self.send_telegram_message(f"❌ {symbol} Failed to fetch price for opening position")
                 return
             
             available = self.fetch_real_balance()
@@ -1316,12 +1313,11 @@ Use the buttons below to control the bot or type /help for more information.
                 f"Size: `{size:.4f}`\n"
                 f"SL: `${stop_loss:.4f}`\n"
                 f"TP: `${take_profit:.4f}`\n"
-                f"Leverage: `{LEVERAGE}x`",
-                chat_id
+                f"Leverage: `{LEVERAGE}x`"
             )
             print(f"[TRADE] 🟢 {symbol} Opened {direction.upper()} position at ${price:.4f}, size: {size:.4f}, SL: ${stop_loss:.4f}")
 
-    def close_trade(self, trade, current_price, reason, chat_id=None):
+    def close_trade(self, trade, current_price, reason):
         symbol = trade.get('symbol', TRADING_SYMBOLS[0])
         with self.trade_lock:
             trade['exit_time'] = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -1354,8 +1350,7 @@ Use the buttons below to control the bot or type /help for more information.
                 f"Entry: `${trade['entry_price']:.4f}`\n"
                 f"Exit: `${current_price:.4f}`\n"
                 f"PNL: `${trade['pnl']:.4f}` ({pnl_percent:+.2f}%)\n"
-                f"Reason: `{reason}`",
-                chat_id
+                f"Reason: `{reason}`"
             )
             
             print(f"[TRADE] 🔴 {symbol} Closed {trade['action'].upper()} position | "
@@ -1364,7 +1359,7 @@ Use the buttons below to control the bot or type /help for more information.
                   f"PNL: ${trade['pnl']:.4f} (Fee: ${trade['fee']:.4f}) | "
                   f"Reason: {reason}")
 
-    def close_position(self, direction, reason="signal", chat_id=None, symbol=None):
+    def close_position(self, direction, reason="signal", symbol=None):
         if symbol is None:
             # Try to find any open position of this direction
             for sym in TRADING_SYMBOLS:
@@ -1378,7 +1373,7 @@ Use the buttons below to control the bot or type /help for more information.
             
             if symbol is None:
                 print(f"[TRADE] No open {direction.upper()} positions to close 🤷‍♂️")
-                self.send_telegram_message(f"❌ No open {direction.upper()} position to close", chat_id)
+                self.send_telegram_message(f"❌ No open {direction.upper()} position to close")
                 return
         
         data = self.symbol_data[symbol]
@@ -1388,18 +1383,18 @@ Use the buttons below to control the bot or type /help for more information.
             position = data['short_position']
         else:
             print(f"[TRADE] {symbol} No open {direction.upper()} positions to close 🤷‍♂️")
-            self.send_telegram_message(f"❌ {symbol} No open {direction.upper()} position to close", chat_id)
+            self.send_telegram_message(f"❌ {symbol} No open {direction.upper()} position to close")
             return
             
         current_price = self.get_current_price(symbol)
         if current_price is None:
             print(f"[TRADE] {symbol} Failed to fetch current price for closing positions")
-            self.send_telegram_message(f"❌ {symbol} Failed to fetch price for closing position", chat_id)
+            self.send_telegram_message(f"❌ {symbol} Failed to fetch price for closing position")
             return
 
-        self.close_trade(position, current_price, reason, chat_id)
+        self.close_trade(position, current_price, reason)
 
-    def close_half_position(self, direction, chat_id=None, symbol=None):
+    def close_half_position(self, direction, symbol=None):
         """Manually close half of the position"""
         if symbol is None:
             # Try to find any open position of this direction
@@ -1434,7 +1429,7 @@ Use the buttons below to control the bot or type /help for more information.
             print(f"[HALF EXIT] {symbol} Failed to fetch current price")
             return
 
-        self.execute_half_exit(position, current_price, chat_id, symbol)
+        self.execute_half_exit(position, current_price, symbol)
 
     # ========== Risk Management ==========
     def monitor_positions(self):
@@ -1472,8 +1467,7 @@ Use the buttons below to control the bot or type /help for more information.
                 self.send_telegram_message(
                     f"🛑 *STOP LOSS HIT - {symbol} LONG*\n"
                     f"Price: `${current_price:.4f}`\n"
-                    f"Stop Loss: `${position['stop_loss']:.4f}`"
-                )
+                    f"Stop Loss: `${position['stop_loss']:.4f}`")
                 self.close_trade(position, current_price, "stop_loss")
                 return
 
@@ -1485,8 +1479,7 @@ Use the buttons below to control the bot or type /help for more information.
                 self.send_telegram_message(
                     f"🛑 *STOP LOSS HIT - {symbol} SHORT*\n"
                     f"Price: `${current_price:.4f}`\n"
-                    f"Stop Loss: `${position['stop_loss']:.4f}`"
-                )
+                    f"Stop Loss: `${position['stop_loss']:.4f}`")
                 self.close_trade(position, current_price, "stop_loss")
                 return
 
