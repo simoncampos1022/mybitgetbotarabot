@@ -170,6 +170,9 @@ class AutoTradeBot:
         # User state management for symbol selection
         self.user_states = {}  # {chat_id: {'action': 'open_long', 'symbol': None}}
         
+        # User state management for symbol selection
+        self.user_states = {}  # {chat_id: {'action': 'open_long', 'symbol': None}}
+        
         # Set leverage for all symbols
         for symbol in TRADING_SYMBOLS:
             self.set_leverage(LEVERAGE, symbol)
@@ -276,6 +279,9 @@ class AutoTradeBot:
     def process_message_queue(self):
         """Background thread to process message queue and send Telegram messages"""
         print("[TELEGRAM] Starting message queue processor...")
+        # Create a new event loop for this thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         
         while self.running:
             try:
@@ -292,51 +298,17 @@ class AutoTradeBot:
                 message = msg_data['message']
                 chat_id = msg_data['chat_id']
                 
-                # Get the application's event loop and schedule the coroutine on it
+                # Send the message using the thread's event loop
                 try:
-                    # Wait a bit for the application to initialize its event loop
-                    max_wait = 20
-                    wait_count = 0
-                    loop = None
-                    
-                    while wait_count < max_wait:
-                        try:
-                            # Try to get the event loop from the application
-                            if hasattr(self.telegram_app, 'updater') and self.telegram_app.updater:
-                                loop = self.telegram_app.updater._event_loop
-                            elif hasattr(self.telegram_app.bot, '_loop'):
-                                loop = self.telegram_app.bot._loop
-                            
-                            if loop and loop.is_running():
-                                # Schedule the coroutine on the application's event loop
-                                future = asyncio.run_coroutine_threadsafe(
-                                    self.send_telegram_message_async(message, chat_id),
-                                    loop
-                                )
-                                # Wait for completion (with timeout)
-                                try:
-                                    future.result(timeout=10)
-                                    break  # Success, exit the wait loop
-                                except Exception as e:
-                                    print(f"[TELEGRAM] Error waiting for message send: {e}")
-                                    break
-                            else:
-                                wait_count += 1
-                                time.sleep(0.5)
-                        except (AttributeError, RuntimeError) as e:
-                            # Loop not available yet or other error
-                            wait_count += 1
-                            time.sleep(0.5)
-                    
-                    if wait_count >= max_wait or not loop:
-                        print(f"[TELEGRAM] Could not get application event loop, message not sent: {message[:50]}...")
-                        
+                    loop.run_until_complete(self.send_telegram_message_async(message, chat_id))
                 except Exception as e:
                     print(f"[TELEGRAM] Error sending message: {e}")
                     
             except Exception as e:
                 print(f"[TELEGRAM] Error in message queue processor: {e}")
                 time.sleep(1)
+        
+        loop.close()
 
     async def send_telegram_message_async(self, message, chat_id=AUTHORIZED_CHAT_ID):
         """Async method to send Telegram message - always uses authorized chat_id"""
