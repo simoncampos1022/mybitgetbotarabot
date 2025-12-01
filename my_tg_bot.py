@@ -1137,9 +1137,9 @@ Use the buttons below to control the bot or type /help for more information.
             self.save_trades()
 
             self.send_telegram_message(f"[HALF EXIT] 🔵 {symbol} Executed half exit for {position['action'].upper()} position | "
-                  f"Exit Price: ${current_price:.4f} | "
-                  f"Half Size: {half_size:.4f} | "
-                  f"Remaining Size: {remaining_size:.4f} | "
+                  f"Exit Price: `${current_price:.4f}`\n"
+                  f"Half Size: `{half_size:.4f}`\n"
+                  f"Remaining Size: `{remaining_size:.4f}`\n"
                   f"PNL: ${net_pnl:.4f}"
                   )
             
