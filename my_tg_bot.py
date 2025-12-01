@@ -278,12 +278,35 @@ class AutoTradeBot:
             'chat_id': authorized_chat_id
         })
     
+    def get_main_event_loop(self):
+        """Get the main event loop from the telegram application"""
+        if not self.telegram_app:
+            return None
+        
+        try:
+            # Try to get loop from application's updater
+            if hasattr(self.telegram_app, 'updater') and self.telegram_app.updater:
+                if hasattr(self.telegram_app.updater, '_event_loop'):
+                    loop = self.telegram_app.updater._event_loop
+                    if loop and not loop.is_closed():
+                        return loop
+        except (AttributeError, RuntimeError):
+            pass
+        
+        try:
+            # Try to get loop from application's internal structure
+            if hasattr(self.telegram_app, '_application'):
+                app_internal = self.telegram_app._application
+                if hasattr(app_internal, '_loop') and app_internal._loop is not None and not app_internal._loop.is_closed():
+                    return app_internal._loop
+        except (AttributeError, RuntimeError):
+            pass
+        
+        return None
+
     def process_message_queue(self):
         """Background thread to process message queue and send Telegram messages"""
         print("[TELEGRAM] Starting message queue processor...")
-        # Create a new event loop for this thread
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
         
         while self.running:
             try:
@@ -297,20 +320,33 @@ class AutoTradeBot:
                     print(f"[TELEGRAM] App not initialized, skipping message")
                     continue
                 
+                # Get the main event loop from the telegram application
+                main_loop = self.get_main_event_loop()
+                
+                if main_loop is None:
+                    # If we can't get the loop, wait a bit and put message back
+                    print(f"[TELEGRAM] Event loop not available yet, retrying...")
+                    time.sleep(0.5)
+                    self.message_queue.put(msg_data)
+                    continue
+                
                 message = msg_data['message']
                 chat_id = msg_data['chat_id']
                 
-                # Send the message using the thread's event loop
+                # Schedule the coroutine on the main event loop from this thread
                 try:
-                    loop.run_until_complete(self.send_telegram_message_async(message, chat_id))
+                    future = asyncio.run_coroutine_threadsafe(
+                        self.send_telegram_message_async(message, chat_id),
+                        main_loop
+                    )
+                    # Wait for the result (with timeout)
+                    future.result(timeout=10)
                 except Exception as e:
                     print(f"[TELEGRAM] Error sending message: {e}")
                     
             except Exception as e:
                 print(f"[TELEGRAM] Error in message queue processor: {e}")
                 time.sleep(1)
-        
-        loop.close()
 
     async def send_telegram_message_async(self, message, chat_id=AUTHORIZED_CHAT_ID):
         """Async method to send Telegram message - always uses authorized chat_id"""
