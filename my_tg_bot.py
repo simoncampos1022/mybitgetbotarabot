@@ -1107,13 +1107,25 @@ Use the buttons below to control the bot or type /help for more information.
                 'original_size': position['original_size']
             }
 
+            # Send order first and check if it succeeds
+            order_success, order_error = self.send_order(f'exit_{position["action"]}', current_price, half_size, 50, symbol)
+            
+            if not order_success:
+                error_msg = f"❌ *FAILED TO HALF EXIT {symbol} {position['action'].upper()} POSITION*\n"
+                error_msg += f"Exit Price: `${current_price:.4f}`\n"
+                error_msg += f"Half Size: `{half_size:.4f}`\n"
+                error_msg += f"Error: `{order_error}`"
+                self.send_telegram_message(error_msg)
+                print(f"[HALF EXIT] 🔴 {symbol} Failed to half exit {position['action'].upper()} position - {order_error}")
+                return
+            
+            # Order succeeded, update position and save
             position['size'] = remaining_size
             position['half_exit_done'] = True
             position['trailing_stop_active'] = True
 
             self.trades.append(half_trade)
-
-            # self.send_order(f'exit_{position["action"]}', current_price, half_size, 50, symbol)
+            self.save_trades()
 
             self.send_telegram_message(f"[HALF EXIT] 🔵 {symbol} Executed half exit for {position['action'].upper()} position | "
                   f"Exit Price: ${current_price:.4f} | "
@@ -1127,8 +1139,6 @@ Use the buttons below to control the bot or type /help for more information.
                   f"Half Size: {half_size:.4f} | "
                   f"Remaining Size: {remaining_size:.4f} | "
                   f"PNL: ${net_pnl:.4f}")
-
-            self.save_trades()
 
     def update_indicators(self, symbol=None):
         if symbol is None:
@@ -1311,6 +1321,19 @@ Use the buttons below to control the bot or type /help for more information.
                 stop_loss = price + initial_risk
                 take_profit = price - initial_profit
 
+            # Send order first and check if it succeeds
+            order_success, order_error = self.send_order(direction, price, size, symbol)
+            
+            if not order_success:
+                error_msg = f"❌ *FAILED TO OPEN {symbol} {direction.upper()} POSITION*\n"
+                error_msg += f"Price: `${price:.4f}`\n"
+                error_msg += f"Size: `{size:.4f}`\n"
+                error_msg += f"Error: `{order_error}`"
+                self.send_telegram_message(error_msg)
+                print(f"[TRADE] 🔴 {symbol} Failed to open {direction.upper()} position - {order_error}")
+                return
+            
+            # Order succeeded, create and save the position
             trade = {
                 'symbol': symbol,
                 'entry_time': current_time,
@@ -1331,8 +1354,6 @@ Use the buttons below to control the bot or type /help for more information.
                 'half_exit_done': False,
                 'original_size': size
             }
-            
-            # self.send_order(direction, price, size, symbol)
 
             if direction == 'long':
                 data['long_position'] = trade
@@ -1370,13 +1391,27 @@ Use the buttons below to control the bot or type /help for more information.
             trade['status'] = 'closed'
             trade['reason'] = reason
             
+            # Send order first and check if it succeeds
+            order_success, order_error = self.send_order(f'exit_{trade["action"]}', current_price, trade['size'], 100, symbol)
+            
+            if not order_success:
+                error_msg = f"❌ *FAILED TO CLOSE {symbol} {trade['action'].upper()} POSITION*\n"
+                error_msg += f"Entry: `${trade['entry_price']:.4f}`\n"
+                error_msg += f"Exit Price: `${current_price:.4f}`\n"
+                error_msg += f"Size: `{trade['size']:.4f}`\n"
+                error_msg += f"Error: `{order_error}`"
+                self.send_telegram_message(error_msg)
+                print(f"[TRADE] 🔴 {symbol} Failed to close {trade['action'].upper()} position - {order_error}")
+                # Don't update position status if order failed
+                return
+            
+            # Order succeeded, finalize the close
             data = self.symbol_data[symbol]
             if trade['action'] == 'long':
                 data['long_position'] = None
             else:
                 data['short_position'] = None
-
-            # self.send_order(f'exit_{trade["action"]}', current_price, trade['size'], 100, symbol)
+            
             self.save_trades()
 
             pnl_percent = (trade['pnl'] / (trade['entry_price'] * trade['size'] / LEVERAGE)) * 100
@@ -1520,6 +1555,7 @@ Use the buttons below to control the bot or type /help for more information.
 
     # ========== Utility Methods ==========
     def send_order(self, action, price, size=None, per=None, symbol=None):
+        """Send order to exchange and return (success: bool, error_msg: str)"""
         if symbol is None:
             symbol = TRADING_SYMBOLS[0]
         if action in ["short", "long"]:
@@ -1555,7 +1591,7 @@ Use the buttons below to control the bot or type /help for more information.
             }
             
         else:
-            return
+            return False, "Invalid action"
         
         print(f"[Signal 🟡] {symbol} Sending: {params}")
 
@@ -1565,12 +1601,18 @@ Use the buttons below to control the bot or type /help for more information.
                 result = response.json()
                 if result.get('code') == '00000':
                     print(f"[Signal 🟢] {symbol} Order placed successfully: {result.get('data')}")
+                    return True, None
                 else:
-                    print(f"[Signal 🔴] {symbol} Order placement failed: {result.get('msg')}")
+                    error_msg = result.get('msg', 'Unknown error')
+                    print(f"[Signal 🔴] {symbol} Order placement failed: {error_msg}")
+                    return False, error_msg
             except Exception as e:
-                print(f"[Signal 🔴] {symbol} Failed order :", e)
+                error_msg = f"Exception: {str(e)}"
+                print(f"[Signal 🔴] {symbol} Failed order: {error_msg}")
+                return False, error_msg
         else:
             print(f"[Signal 🟡] {symbol} Order sending is disabled. Order not sent.")
+            return False, "Order sending is disabled"
 
     def save_trades(self):
         try:
