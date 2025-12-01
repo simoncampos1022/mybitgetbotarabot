@@ -1618,7 +1618,7 @@ Use the buttons below to control the bot or type /help for more information.
         if self.flag_api_sent:
             try:
                 response = self.maxOrderApi.placeOrder(params)
-                result = response.json()
+                result = response
                 if result.get('code') == '00000':
                     print(f"[Signal 🟢] {symbol} Order placed successfully: {result.get('data')}")
                     return True, None
