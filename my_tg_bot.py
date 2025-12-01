@@ -177,7 +177,7 @@ class AutoTradeBot:
             if price is None:
                 print(f"[INIT] Initial price from REST for {symbol}: None")
             else:
-                print(f"[INIT] Initial price from REST for {symbol}: ${price:.2f}")
+                print(f"[INIT] Initial price from REST for {symbol}: ${price:.4f}")
                 self.symbol_data[symbol]['current_price'] = price
         
         # Load existing trades from CSV
@@ -287,9 +287,9 @@ class AutoTradeBot:
                 has_positions = True
                 position_info += f"\n*{symbol}:*\n"
                 if long_pos:
-                    position_info += f"📈 LONG: ${long_pos['entry_price']:.2f} | SL: ${long_pos['stop_loss']:.2f} | TP: ${long_pos['take_profit']:.2f}\n"
+                    position_info += f"📈 LONG: ${long_pos['entry_price']:.4f} | SL: ${long_pos['stop_loss']:.4f} | TP: ${long_pos['take_profit']:.4f}\n"
                 if short_pos:
-                    position_info += f"📉 SHORT: ${short_pos['entry_price']:.2f} | SL: ${short_pos['stop_loss']:.2f} | TP: ${short_pos['take_profit']:.2f}\n"
+                    position_info += f"📉 SHORT: ${short_pos['entry_price']:.4f} | SL: ${short_pos['stop_loss']:.4f} | TP: ${short_pos['take_profit']:.4f}\n"
         
         if not has_positions:
             position_info = "📊 *No open positions*\n"
@@ -299,16 +299,16 @@ class AutoTradeBot:
         for symbol in TRADING_SYMBOLS:
             data = self.symbol_data[symbol]
             price = data['current_price']
-            price_msg = f"${price:.2f}" if price else "N/A"
+            price_msg = f"${price:.4f}" if price else "N/A"
             indicators_info += f"\n*{symbol}:*\n"
             indicators_info += f"• Price: {price_msg}\n"
-            indicators_info += f"• ATR: {data['current_atr_value']:.2f}\n"
-            indicators_info += f"• Volume Osc: {data['current_vol_os']:.2f}%\n"
-            indicators_info += f"• RSI: {data['current_rsi_value']:.2f}\n"
+            indicators_info += f"• ATR: {data['current_atr_value']:.4f}\n"
+            indicators_info += f"• Volume Osc: {data['current_vol_os']:.4f}%\n"
+            indicators_info += f"• RSI: {data['current_rsi_value']:.4f}\n"
             if data['fs']:
-                indicators_info += f"• FS: {data['fs'][-1]:.2f}\n"
+                indicators_info += f"• FS: {data['fs'][-1]:.4f}\n"
             if data['tr']:
-                indicators_info += f"• TR: {data['tr'][-1]:.2f}\n"
+                indicators_info += f"• TR: {data['tr'][-1]:.4f}\n"
         
         # Performance
         closed_trades = [t for t in self.trades if t['status'] == 'closed']
@@ -318,8 +318,8 @@ class AutoTradeBot:
         
         performance_info = f"""
 💰 *Performance:*
-• Balance: `${self.balance:.2f}`
-• Total PNL: `${total_pnl:.2f}`
+• Balance: `${self.balance:.4f}`
+• Total PNL: `${total_pnl:.4f}`
 • Total Trades: `{len(closed_trades)}`
 • Win Rate: `{win_rate:.1f}%`
 • Open Positions: `{len([t for t in self.trades if t['status'] == 'open'])}`
@@ -344,10 +344,10 @@ class AutoTradeBot:
             history_msg += f"""
 *Trade {i} ({symbol}):*
 • Action: `{trade['action'].upper()}`
-• Entry: `${trade['entry_price']:.2f}`
-• Exit: `${trade['exit_price']:.2f}`
-• PNL: `${trade['pnl']:.2f}` ({pnl_percent:+.2f}%)
-• Size: `{trade['size']:.2f}`
+• Entry: `${trade['entry_price']:.4f}`
+• Exit: `${trade['exit_price']:.4f}`
+• PNL: `${trade['pnl']:.4f}` ({pnl_percent:+.2f}%)
+• Size: `{trade['size']:.4f}`
 • Reason: `{trade['reason']}`
 • Date: `{trade['exit_time'][:19]} UTC`
 ────────────────────
@@ -380,18 +380,18 @@ class AutoTradeBot:
 • Winning Trades: `{win_trades}`
 • Losing Trades: `{loss_trades}`
 • Win Rate: `{win_rate:.1f}%`
-• Total PNL: `${total_pnl:.2f}`
-• ROI: `{(total_pnl/self.initial_balance)*100:.2f}%`
+• Total PNL: `${total_pnl:.4f}`
+• ROI: `{(total_pnl/self.initial_balance)*100:.4f}%`
 
 """
         
         if best_trade:
             best_pnl_percent = (best_trade['pnl'] / (best_trade['entry_price'] * best_trade['size'] / LEVERAGE)) * 100
-            history_msg += f"🏆 *Best Trade:* `${best_trade['pnl']:.2f}` ({best_pnl_percent:+.2f}%)\n"
+            history_msg += f"🏆 *Best Trade:* `${best_trade['pnl']:.4f}` ({best_pnl_percent:+.2f}%)\n"
         
         if worst_trade:
             worst_pnl_percent = (worst_trade['pnl'] / (worst_trade['entry_price'] * worst_trade['size'] / LEVERAGE)) * 100
-            history_msg += f"📉 *Worst Trade:* `${worst_trade['pnl']:.2f}` ({worst_pnl_percent:+.2f}%)\n"
+            history_msg += f"📉 *Worst Trade:* `${worst_trade['pnl']:.4f}` ({worst_pnl_percent:+.2f}%)\n"
         
         history_msg += f"\n*Recent Trades:*\n"
         
@@ -401,8 +401,8 @@ class AutoTradeBot:
             emoji = "🟢" if trade['pnl'] > 0 else "🔴" if trade['pnl'] < 0 else "⚪"
             
             history_msg += f"""
-{emoji} *{trade['action'].upper()}* | PNL: `${trade['pnl']:.2f}` ({pnl_percent:+.2f}%)
-   Entry: `${trade['entry_price']:.2f}` | Exit: `${trade['exit_price']:.2f}`
+{emoji} *{trade['action'].upper()}* | PNL: `${trade['pnl']:.4f}` ({pnl_percent:+.2f}%)
+   Entry: `${trade['entry_price']:.4f}` | Exit: `${trade['exit_price']:.4f}`
    Reason: `{trade['reason']}` | Date: `{trade['exit_time'][:19]}`
 """
         
@@ -501,10 +501,10 @@ Use the buttons below to control the bot or type /help for more information.
             
             balance_msg = f"""
 💼 *Account Balance:*
-• Current Balance: `${self.balance:.2f}`
-• Initial Balance: `${self.initial_balance:.2f}`
-• Total PNL: `${total_pnl:.2f}`
-• ROI: `{(total_pnl/self.initial_balance)*100:.2f}%`
+• Current Balance: `${self.balance:.4f}`
+• Initial Balance: `${self.initial_balance:.4f}`
+• Total PNL: `${total_pnl:.4f}`
+• ROI: `{(total_pnl/self.initial_balance)*100:.4f}%`
 
 📈 *Performance:*
 • Total Trades: `{len(closed_trades)}`
@@ -586,11 +586,11 @@ Use the buttons below to control the bot or type /help for more information.
                         unrealized_pnl = (price - long_pos['entry_price']) * long_pos['size'] if price else 0
                         positions_msg += f"""
 📈 *LONG Position:*
-• Entry Price: `${long_pos['entry_price']:.2f}`
-• Size: `{long_pos['size']:.2f}`
-• Stop Loss: `${long_pos['stop_loss']:.2f}`
-• Take Profit: `${long_pos['take_profit']:.2f}`
-• Unrealized PNL: `${unrealized_pnl:.2f}`
+• Entry Price: `${long_pos['entry_price']:.4f}`
+• Size: `{long_pos['size']:.4f}`
+• Stop Loss: `${long_pos['stop_loss']:.4f}`
+• Take Profit: `${long_pos['take_profit']:.4f}`
+• Unrealized PNL: `${unrealized_pnl:.4f}`
 • Trailing Stop: `{'Active' if long_pos.get('trailing_stop_active', False) else 'Inactive'}`
                         """
                     
@@ -599,11 +599,11 @@ Use the buttons below to control the bot or type /help for more information.
                         unrealized_pnl = (short_pos['entry_price'] - price) * short_pos['size'] if price else 0
                         positions_msg += f"""
 📉 *SHORT Position:*
-• Entry Price: `${short_pos['entry_price']:.2f}`
-• Size: `{short_pos['size']:.2f}`
-• Stop Loss: `${short_pos['stop_loss']:.2f}`
-• Take Profit: `${short_pos['take_profit']:.2f}`
-• Unrealized PNL: `${unrealized_pnl:.2f}`
+• Entry Price: `${short_pos['entry_price']:.4f}`
+• Size: `{short_pos['size']:.4f}`
+• Stop Loss: `${short_pos['stop_loss']:.4f}`
+• Take Profit: `${short_pos['take_profit']:.4f}`
+• Unrealized PNL: `${unrealized_pnl:.4f}`
 • Trailing Stop: `{'Active' if short_pos.get('trailing_stop_active', False) else 'Inactive'}`
                         """
                     positions_msg += "\n"
@@ -689,7 +689,7 @@ Use the buttons below to control the bot or type /help for more information.
             for acc in accounts:
                 if acc.get('marginCoin') == 'USDT':
                     available = float(acc.get('available', 0))
-                    print(f"[BALANCE 🟢] Fetched real balance: ${available:.2f} USDT")
+                    print(f"[BALANCE 🟢] Fetched real balance: ${available:.4f} USDT")
                     return available
 
             print("[BALANCE 🔴] USDT account not found")
@@ -736,8 +736,8 @@ Use the buttons below to control the bot or type /help for more information.
             for ticker in response['data']:
                 if ticker['symbol'] == symbol:
                     price = float(ticker['lastPr'])
-                    self.symbol_data[symbol]['current_price'] = round(price, 2)
-                    return round(price, 2)
+                    self.symbol_data[symbol]['current_price'] = round(price, 4)
+                    return round(price, 4)
                     
             print(f"[REST] {symbol} symbol not found in response")
             return None
@@ -870,7 +870,7 @@ Use the buttons below to control the bot or type /help for more information.
             if current_price > position['max_profit_price']:
                 position['max_profit_price'] = current_price
                 changed = True
-                print(f"[TRAILING STOP] {symbol} New max profit price for LONG: ${position['max_profit_price']:.2f}")
+                print(f"[TRAILING STOP] {symbol} New max profit price for LONG: ${position['max_profit_price']:.4f}")
 
             if not position.get('half_exit_done', False) and current_price >= take_profit:
                 self.execute_half_exit(position, current_price, None, symbol)
@@ -882,13 +882,13 @@ Use the buttons below to control the bot or type /help for more information.
                 if trailing_stop_price > position['stop_loss']:
                     position['stop_loss'] = trailing_stop_price
                     changed = True
-                    print(f"[TRAILING STOP] {symbol} Updated stop loss for LONG: ${position['stop_loss']:.2f}")
+                    print(f"[TRAILING STOP] {symbol} Updated stop loss for LONG: ${position['stop_loss']:.4f}")
 
         else:  # short
             if current_price < position['max_profit_price']:
                 position['max_profit_price'] = current_price
                 changed = True
-                print(f"[TRAILING STOP] {symbol} New max profit price for SHORT: ${position['max_profit_price']:.2f}")
+                print(f"[TRAILING STOP] {symbol} New max profit price for SHORT: ${position['max_profit_price']:.4f}")
 
             if not position.get('half_exit_done', False) and current_price <= take_profit:
                 self.execute_half_exit(position, current_price, None, symbol)
@@ -900,7 +900,7 @@ Use the buttons below to control the bot or type /help for more information.
                 if trailing_stop_price < position['stop_loss']:
                     position['stop_loss'] = trailing_stop_price
                     changed = True
-                    print(f"[TRAILING STOP] {symbol} Updated stop loss for SHORT: ${position['stop_loss']:.2f}")
+                    print(f"[TRAILING STOP] {symbol} Updated stop loss for SHORT: ${position['stop_loss']:.4f}")
 
         if changed:
             self.save_trades()
@@ -960,18 +960,18 @@ Use the buttons below to control the bot or type /help for more information.
             # self.send_order(f'exit_{position["action"]}', current_price, half_size, 50, symbol)
 
             self.send_telegram_message(f"[HALF EXIT] 🔵 {symbol} Executed half exit for {position['action'].upper()} position | "
-                  f"Exit Price: ${current_price:.2f} | "
-                  f"Half Size: {half_size:.2f} | "
-                  f"Remaining Size: {remaining_size:.2f} | "
-                  f"PNL: ${net_pnl:.2f}",
+                  f"Exit Price: ${current_price:.4f} | "
+                  f"Half Size: {half_size:.4f} | "
+                  f"Remaining Size: {remaining_size:.4f} | "
+                  f"PNL: ${net_pnl:.4f}",
                   chat_id
                   )
             
             print(f"[HALF EXIT] 🔵 {symbol} Executed half exit for {position['action'].upper()} position | "
-                  f"Exit Price: ${current_price:.2f} | "
-                  f"Half Size: {half_size:.2f} | "
-                  f"Remaining Size: {remaining_size:.2f} | "
-                  f"PNL: ${net_pnl:.2f}")
+                  f"Exit Price: ${current_price:.4f} | "
+                  f"Half Size: {half_size:.4f} | "
+                  f"Remaining Size: {remaining_size:.4f} | "
+                  f"PNL: ${net_pnl:.4f}")
 
             self.save_trades()
 
@@ -1004,11 +1004,11 @@ Use the buttons below to control the bot or type /help for more information.
         self.symbol_data[symbol]['current_atr_value'] = df['atr'].iloc[-1]
         self.symbol_data[symbol]['current_rsi_value'] = df['rsi'].iloc[-1]
 
-        print(f"[INDICATORS] {symbol} Updated FS: {self.symbol_data[symbol]['fs'][-1]:.2f}, "
-            f"TR: {self.symbol_data[symbol]['tr'][-1]:.2f}, "
-            f"VOL_OS: {self.symbol_data[symbol]['current_vol_os']:.2f}, "
-            f"ATR_VAL: {self.symbol_data[symbol]['current_atr_value']:.2f}, "
-            f"RSI_VALUE: {self.symbol_data[symbol]['current_rsi_value']:.2f}")
+        print(f"[INDICATORS] {symbol} Updated FS: {self.symbol_data[symbol]['fs'][-1]:.4f}, "
+            f"TR: {self.symbol_data[symbol]['tr'][-1]:.4f}, "
+            f"VOL_OS: {self.symbol_data[symbol]['current_vol_os']:.4f}, "
+            f"ATR_VAL: {self.symbol_data[symbol]['current_atr_value']:.4f}, "
+            f"RSI_VALUE: {self.symbol_data[symbol]['current_rsi_value']:.4f}")
 
     # ========== Trading Logic ==========
     def evaluate_condition(self, value, operator, threshold):
@@ -1043,11 +1043,11 @@ Use the buttons below to control the bot or type /help for more information.
         
         fs_now = data['fs'][-1]
         tr_now = data['tr'][-1]
-        print(f"[{current_time}] {symbol} 1H indicator values now fs:{fs_now:.2f}, tr:{tr_now:.2f}")
+        print(f"[{current_time}] {symbol} 1H indicator values now fs:{fs_now:.4f}, tr:{tr_now:.4f}")
         
         fs_prev = data['fs'][-2]
         tr_prev = data['tr'][-2]
-        print(f"[{current_time}] {symbol} 1H indicator values prev fs:{fs_prev:.2f}, tr:{tr_prev:.2f}")
+        print(f"[{current_time}] {symbol} 1H indicator values prev fs:{fs_prev:.4f}, tr:{tr_prev:.4f}")
 
         fs_cross_up = (fs_prev < tr_prev) and (fs_now > tr_now)
         fs_cross_down = (fs_prev > tr_prev) and (fs_now < tr_now)
@@ -1191,14 +1191,14 @@ Use the buttons below to control the bot or type /help for more information.
             
             self.send_telegram_message(
                 f"✅ *OPENED {symbol} {direction.upper()} POSITION*\n"
-                f"Price: `${price:.2f}`\n"
-                f"Size: `{size:.2f}`\n"
-                f"SL: `${stop_loss:.2f}`\n"
-                f"TP: `${take_profit:.2f}`\n"
+                f"Price: `${price:.4f}`\n"
+                f"Size: `{size:.4f}`\n"
+                f"SL: `${stop_loss:.4f}`\n"
+                f"TP: `${take_profit:.4f}`\n"
                 f"Leverage: `{LEVERAGE}x`",
                 chat_id
             )
-            print(f"[TRADE] 🟢 {symbol} Opened {direction.upper()} position at ${price:.2f}, size: {size:.2f}, SL: ${stop_loss:.2f}")
+            print(f"[TRADE] 🟢 {symbol} Opened {direction.upper()} position at ${price:.4f}, size: {size:.4f}, SL: ${stop_loss:.4f}")
 
     def close_trade(self, trade, current_price, reason, chat_id=None):
         symbol = trade.get('symbol', TRADING_SYMBOLS[0])
@@ -1230,17 +1230,17 @@ Use the buttons below to control the bot or type /help for more information.
             pnl_percent = (trade['pnl'] / (trade['entry_price'] * trade['size'] / LEVERAGE)) * 100
             self.send_telegram_message(
                 f"🔴 *CLOSED {symbol} {trade['action'].upper()} POSITION*\n"
-                f"Entry: `${trade['entry_price']:.2f}`\n"
-                f"Exit: `${current_price:.2f}`\n"
-                f"PNL: `${trade['pnl']:.2f}` ({pnl_percent:+.2f}%)\n"
+                f"Entry: `${trade['entry_price']:.4f}`\n"
+                f"Exit: `${current_price:.4f}`\n"
+                f"PNL: `${trade['pnl']:.4f}` ({pnl_percent:+.2f}%)\n"
                 f"Reason: `{reason}`",
                 chat_id
             )
             
             print(f"[TRADE] 🔴 {symbol} Closed {trade['action'].upper()} position | "
-                  f"Entry: ${trade['entry_price']:.2f} | "
-                  f"Exit: ${current_price:.2f} | "
-                  f"PNL: ${trade['pnl']:.2f} (Fee: ${trade['fee']:.2f}) | "
+                  f"Entry: ${trade['entry_price']:.4f} | "
+                  f"Exit: ${current_price:.4f} | "
+                  f"PNL: ${trade['pnl']:.4f} (Fee: ${trade['fee']:.4f}) | "
                   f"Reason: {reason}")
 
     def close_position(self, direction, reason="signal", chat_id=None, symbol=None):
@@ -1347,11 +1347,11 @@ Use the buttons below to control the bot or type /help for more information.
         if data['long_position']:
             position = data['long_position']
             if current_price <= position['stop_loss']:
-                print(f"[RISK] {symbol} Stop loss hit for LONG: ${current_price:.2f} <= ${position['stop_loss']:.2f}")
+                print(f"[RISK] {symbol} Stop loss hit for LONG: ${current_price:.4f} <= ${position['stop_loss']:.4f}")
                 self.send_telegram_message(
                     f"🛑 *STOP LOSS HIT - {symbol} LONG*\n"
-                    f"Price: `${current_price:.2f}`\n"
-                    f"Stop Loss: `${position['stop_loss']:.2f}`"
+                    f"Price: `${current_price:.4f}`\n"
+                    f"Stop Loss: `${position['stop_loss']:.4f}`"
                 )
                 self.close_trade(position, current_price, "stop_loss")
                 return
@@ -1360,11 +1360,11 @@ Use the buttons below to control the bot or type /help for more information.
         if data['short_position']:
             position = data['short_position']
             if current_price >= position['stop_loss']:
-                print(f"[RISK] {symbol} Stop loss hit for SHORT: ${current_price:.2f} >= ${position['stop_loss']:.2f}")
+                print(f"[RISK] {symbol} Stop loss hit for SHORT: ${current_price:.4f} >= ${position['stop_loss']:.4f}")
                 self.send_telegram_message(
                     f"🛑 *STOP LOSS HIT - {symbol} SHORT*\n"
-                    f"Price: `${current_price:.2f}`\n"
-                    f"Stop Loss: `${position['stop_loss']:.2f}`"
+                    f"Price: `${current_price:.4f}`\n"
+                    f"Stop Loss: `${position['stop_loss']:.4f}`"
                 )
                 self.close_trade(position, current_price, "stop_loss")
                 return
@@ -1385,7 +1385,7 @@ Use the buttons below to control the bot or type /help for more information.
                 "tradeSide": "open",
                 "orderType": self.orderType,
                 "force": "gtc",
-                "price": str(round(price, 2)),
+                "price": str(round(price, 4)),
             }
 
             self.total_trades += 1
@@ -1402,7 +1402,7 @@ Use the buttons below to control the bot or type /help for more information.
                 "tradeSide": "close",
                 "orderType": self.orderType,
                 "force": "gtc",
-                "price": str(round(price, 2))
+                "price": str(round(price, 4))
             }
             
         else:
@@ -1436,17 +1436,17 @@ Use the buttons below to control the bot or type /help for more information.
                         trade['entry_time'],
                         trade['exit_time'],
                         trade['action'],
-                        round(trade['entry_price'], 2),
-                        round(trade['exit_price'], 2) if trade['exit_price'] else '',
+                        round(trade['entry_price'], 4),
+                        round(trade['exit_price'], 4) if trade['exit_price'] else '',
                         round(trade['size'], 2),
                         trade['status'],
                         round(trade['fee'], 2),
                         round(trade['ideal_pnl'], 2),
                         round(trade.get('pnl', 0), 2),
                         trade['reason'],
-                        round(trade['stop_loss'], 2),
-                        round(trade['take_profit'], 2),
-                        round(trade.get('max_profit_price', 0), 2),
+                        round(trade['stop_loss'], 4),
+                        round(trade['take_profit'], 4),
+                        round(trade.get('max_profit_price', 0), 4),
                         str(trade.get('trailing_stop_active', False)),
                         str(trade.get('half_exit_done', False)),
                         round(trade.get('original_size', trade['size']), 2)
@@ -1464,7 +1464,7 @@ Use the buttons below to control the bot or type /help for more information.
             next_time += timedelta(hours=1)
 
         sleep_seconds = (next_time - now).total_seconds()
-        print(f"Sleeping for {sleep_seconds:.2f} seconds until {next_time.strftime('%H:%M:%S')} UTC")
+        print(f"Sleeping for {sleep_seconds:.4f} seconds until {next_time.strftime('%H:%M:%S')} UTC")
         time.sleep(sleep_seconds)
 
     # ========== Main Loop ==========
