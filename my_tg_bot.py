@@ -25,12 +25,13 @@ TELEGRAM_BOT_TOKEN = "8321838467:AAG4s4t8C0Wux71TIq-Dx86NsC0wk3uE6E8"
 AUTHORIZED_CHAT_ID = "7839829083"  # Only this chat ID can use the bot
 
 LEVERAGE = 5
-POSITION_SIZE_RATIO = 0.1
+POSITION_SIZE_RATIO = 0.2
 INTERVAL = "1H"
 FEE_PERCENT = 0.0006
 ATR_LENGTH = 14
 FS_LENGTH = 10
 RSI_LENGTH = 14
+MAX_OPEN_POSITIONS = 4  # Maximum number of open positions allowed
 
 # Symbol Configuration
 # Each symbol has: parameters (10 levels) and operators (6 operators: 3 for long, 3 for short)
@@ -276,54 +277,54 @@ class AutoTradeBot:
             'chat_id': authorized_chat_id
         })
     
-    # def process_message_queue(self):
-    #     """Background thread to process message queue and send Telegram messages"""
-    #     print("[TELEGRAM] Starting message queue processor...")
-    #     # Create a new event loop for this thread
-    #     loop = asyncio.new_event_loop()
-    #     asyncio.set_event_loop(loop)
+    def process_message_queue(self):
+        """Background thread to process message queue and send Telegram messages"""
+        print("[TELEGRAM] Starting message queue processor...")
+        # Create a new event loop for this thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         
-    #     while self.running:
-    #         try:
-    #             # Wait for a message in the queue (with timeout to check if still running)
-    #             try:
-    #                 msg_data = self.message_queue.get(timeout=1)
-    #             except:
-    #                 continue  # Timeout, check if still running
+        while self.running:
+            try:
+                # Wait for a message in the queue (with timeout to check if still running)
+                try:
+                    msg_data = self.message_queue.get(timeout=1)
+                except:
+                    continue  # Timeout, check if still running
                 
-    #             if not self.telegram_app:
-    #                 print(f"[TELEGRAM] App not initialized, skipping message")
-    #                 continue
+                if not self.telegram_app:
+                    print(f"[TELEGRAM] App not initialized, skipping message")
+                    continue
                 
-    #             message = msg_data['message']
-    #             chat_id = msg_data['chat_id']
+                message = msg_data['message']
+                chat_id = msg_data['chat_id']
                 
-    #             # Send the message using the thread's event loop
-    #             try:
-    #                 loop.run_until_complete(self.send_telegram_message_async(message, chat_id))
-    #             except Exception as e:
-    #                 print(f"[TELEGRAM] Error sending message: {e}")
+                # Send the message using the thread's event loop
+                try:
+                    loop.run_until_complete(self.send_telegram_message_async(message, chat_id))
+                except Exception as e:
+                    print(f"[TELEGRAM] Error sending message: {e}")
                     
-    #         except Exception as e:
-    #             print(f"[TELEGRAM] Error in message queue processor: {e}")
-    #             time.sleep(1)
+            except Exception as e:
+                print(f"[TELEGRAM] Error in message queue processor: {e}")
+                time.sleep(1)
         
-    #     loop.close()
+        loop.close()
 
-    # async def send_telegram_message_async(self, message, chat_id=AUTHORIZED_CHAT_ID):
-    #     """Async method to send Telegram message - always uses authorized chat_id"""
-    #     try:
-    #         # Always use authorized chat_id for security
-    #         authorized_chat_id = AUTHORIZED_CHAT_ID
-    #         await self.telegram_app.bot.send_message(
-    #             chat_id=authorized_chat_id,
-    #             text=message,
-    #             reply_markup=self.get_main_keyboard(),
-    #             parse_mode='Markdown'
-    #         )
-    #         print(f"[TELEGRAM] Message sent to authorized chat {authorized_chat_id}")
-    #     except Exception as e:
-    #         print(f"[TELEGRAM ASYNC] Error sending message: {e}")
+    async def send_telegram_message_async(self, message, chat_id=AUTHORIZED_CHAT_ID):
+        """Async method to send Telegram message - always uses authorized chat_id"""
+        try:
+            # Always use authorized chat_id for security
+            authorized_chat_id = AUTHORIZED_CHAT_ID
+            await self.telegram_app.bot.send_message(
+                chat_id=authorized_chat_id,
+                text=message,
+                reply_markup=self.get_main_keyboard(),
+                parse_mode='Markdown'
+            )
+            print(f"[TELEGRAM] Message sent to authorized chat {authorized_chat_id}")
+        except Exception as e:
+            print(f"[TELEGRAM ASYNC] Error sending message: {e}")
     
     def is_authorized(self, chat_id):
         """Check if the chat_id is authorized"""
@@ -1108,7 +1109,7 @@ Use the buttons below to control the bot or type /help for more information.
             }
 
             # Send order first and check if it succeeds
-            order_success, order_error = self.send_order(f'exit_{position["action"]}', current_price, half_size, 50, symbol)
+            order_success, order_error = self.send_order(f'exit_{position["action"]}', current_price, half_size, symbol)
             
             if not order_success:
                 error_msg = f"❌ *FAILED TO HALF EXIT {symbol} {position['action'].upper()} POSITION*\n"
@@ -1278,6 +1279,25 @@ Use the buttons below to control the bot or type /help for more information.
             symbol = TRADING_SYMBOLS[0]  # Default to first symbol for manual commands
             
         with self.trade_lock:
+            # Check total number of open positions across all symbols
+            total_open_positions = 0
+            for sym in TRADING_SYMBOLS:
+                sym_data = self.symbol_data[sym]
+                if sym_data['long_position']:
+                    total_open_positions += 1
+                if sym_data['short_position']:
+                    total_open_positions += 1
+            
+            # Check if we're at the maximum limit
+            if total_open_positions >= MAX_OPEN_POSITIONS:
+                print(f"[TRADE] Cannot open {symbol} {direction.upper()}: Maximum open positions ({MAX_OPEN_POSITIONS}) reached. Current: {total_open_positions}")
+                self.send_telegram_message(
+                    f"❌ *CANNOT OPEN {symbol} {direction.upper()} POSITION*\n"
+                    f"Maximum open positions limit reached: `{MAX_OPEN_POSITIONS}`\n"
+                    f"Current open positions: `{total_open_positions}`"
+                )
+                return
+            
             data = self.symbol_data[symbol]
             config = SYMBOL_CONFIG[symbol]
             
@@ -1392,7 +1412,7 @@ Use the buttons below to control the bot or type /help for more information.
             trade['reason'] = reason
             
             # Send order first and check if it succeeds
-            order_success, order_error = self.send_order(f'exit_{trade["action"]}', current_price, trade['size'], 100, symbol)
+            order_success, order_error = self.send_order(f'exit_{trade["action"]}', current_price, trade['size'], symbol)
             
             if not order_success:
                 error_msg = f"❌ *FAILED TO CLOSE {symbol} {trade['action'].upper()} POSITION*\n"
@@ -1554,7 +1574,7 @@ Use the buttons below to control the bot or type /help for more information.
                 return
 
     # ========== Utility Methods ==========
-    def send_order(self, action, price, size=None, per=None, symbol=None):
+    def send_order(self, action, price, size=None, symbol=None):
         """Send order to exchange and return (success: bool, error_msg: str)"""
         if symbol is None:
             symbol = TRADING_SYMBOLS[0]
