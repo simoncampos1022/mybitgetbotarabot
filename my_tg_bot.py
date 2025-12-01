@@ -244,6 +244,7 @@ class AutoTradeBot:
             [KeyboardButton("📈 Open Long"), KeyboardButton("📉 Open Short")],
             [KeyboardButton("Half Close Long"), KeyboardButton("Half Close Short")],
             [KeyboardButton("🔴 Close Long"), KeyboardButton("🔴 Close Short")],
+            [KeyboardButton("🛑 Close All Positions")],
         ]
         return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     
@@ -510,6 +511,7 @@ Use the buttons below to control the bot or type /help for more information.
 • 📉 Open Short - Force open short position  
 • 🔴 Close Long - Force close long position
 • 🔴 Close Short - Force close short position
+• 🛑 Close All Positions - Fetch and close all open positions from Bitget
 
 *History Commands:*
 • 📜 Recent History - Show last 3 closed positions
@@ -759,6 +761,12 @@ Use the buttons below to control the bot or type /help for more information.
                     reply_markup=self.get_symbol_keyboard("half_close_short", open_symbols),
                     parse_mode='Markdown'
                 )
+        elif message_text == "🛑 Close All Positions":
+            await update.message.reply_text(
+                "🔄 Fetching all open positions from Bitget...",
+                reply_markup=self.get_main_keyboard()
+            )
+            self.close_all_positions()
         else:
             await update.message.reply_text(
                 "❌ Unknown command. Use the buttons below or type /help for available commands.",
@@ -1520,6 +1528,144 @@ Use the buttons below to control the bot or type /help for more information.
             return
 
         self.execute_half_exit(position, current_price, symbol)
+
+    def fetch_open_positions_from_api(self):
+        """Fetch all open positions from Bitget API"""
+        try:
+            params = {
+                "productType": PRODUCT_TYPE,
+                "marginCoin": MARGIN_COIN
+            }
+            response = self.maxAccountApi.allPosition(params)
+            
+            if response.get('code') != '00000':
+                print(f"[API POSITIONS] Error fetching positions: {response.get('msg')}")
+                return []
+            
+            positions = response.get('data', [])
+            # Filter only positions with size > 0 (open positions)
+            open_positions = [pos for pos in positions if float(pos.get('total', 0)) > 0]
+            
+            print(f"[API POSITIONS] Fetched {len(open_positions)} open positions from API")
+            return open_positions
+            
+        except Exception as e:
+            print(f"[API POSITIONS] Error fetching positions from API: {e}")
+            return []
+
+    def close_all_positions(self):
+        """Fetch all open positions from API, display them, and close all"""
+        # Fetch positions from Bitget API
+        api_positions = self.fetch_open_positions_from_api()
+        
+        if not api_positions:
+            message = "📋 *No open positions found on Bitget*\n\nAll positions are already closed."
+            self.send_telegram_message(message)
+            print("[CLOSE ALL] No positions to close")
+            return
+        
+        # Build message showing all open positions
+        positions_msg = "📋 *Current Open Positions on Bitget:*\n\n"
+        positions_to_close = []
+        
+        for pos in api_positions:
+            symbol = pos.get('symbol', 'N/A')
+            hold_side = pos.get('holdSide', '').lower()  # 'long' or 'short' (normalize to lowercase)
+            total_size = float(pos.get('total', 0))
+            available_size = float(pos.get('available', 0))
+            avg_price = float(pos.get('averageOpenPrice', 0))
+            unrealized_pnl = float(pos.get('unrealizedPL', 0))
+            
+            if total_size > 0 and hold_side in ['long', 'short']:
+                side_emoji = "📈" if hold_side == "long" else "📉"
+                positions_msg += f"{side_emoji} *{symbol} {hold_side.upper()}*\n"
+                positions_msg += f"• Size: `{total_size:.4f}`\n"
+                positions_msg += f"• Avg Price: `${avg_price:.4f}`\n"
+                positions_msg += f"• Unrealized PNL: `${unrealized_pnl:.4f}`\n\n"
+                
+                positions_to_close.append({
+                    'symbol': symbol,
+                    'side': hold_side,
+                    'size': available_size if available_size > 0 else total_size,
+                    'avg_price': avg_price
+                })
+        
+        # Send message with all positions
+        self.send_telegram_message(positions_msg)
+        time.sleep(1)  # Small delay before closing
+        
+        # Close all positions
+        closed_count = 0
+        failed_count = 0
+        close_results = []
+        
+        for pos_info in positions_to_close:
+            symbol = pos_info['symbol']
+            side = pos_info['side']
+            size = pos_info['size']
+            
+            # Get current price for closing
+            current_price = self.get_current_price(symbol)
+            if current_price is None:
+                print(f"[CLOSE ALL] {symbol} Failed to get current price")
+                failed_count += 1
+                close_results.append(f"❌ {symbol} {side.upper()}: Failed to get price")
+                continue
+            
+            # Determine close action
+            close_action = "exit_long" if side == "long" else "exit_short"
+            
+            # Send close order
+            order_success, order_error = self.send_order(close_action, current_price, size, symbol)
+            
+            if order_success:
+                closed_count += 1
+                # Update local position tracking if exists (mark as closed without sending another order)
+                data = self.symbol_data.get(symbol)
+                if data:
+                    position = None
+                    if side == 'long' and data.get('long_position'):
+                        position = data['long_position']
+                        data['long_position'] = None
+                    elif side == 'short' and data.get('short_position'):
+                        position = data['short_position']
+                        data['short_position'] = None
+                    
+                    # Update position record if it exists
+                    if position:
+                        position['exit_time'] = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+                        position['exit_price'] = current_price
+                        if position['action'] == 'long':
+                            position['pnl'] = (current_price - position['entry_price']) * position['size']
+                        else:
+                            position['pnl'] = (position['entry_price'] - current_price) * position['size']
+                        position['fee'] = (current_price + position['entry_price']) * FEE_PERCENT * position['size']
+                        position['ideal_pnl'] = position['pnl']
+                        position['pnl'] -= position['fee']
+                        self.balance += position['pnl']
+                        position['status'] = 'closed'
+                        position['reason'] = 'close_all_manual'
+                        self.save_trades()
+                
+                close_results.append(f"✅ {symbol} {side.upper()}: Closed at ${current_price:.4f}")
+                print(f"[CLOSE ALL] ✅ Closed {symbol} {side.upper()} position")
+            else:
+                failed_count += 1
+                close_results.append(f"❌ {symbol} {side.upper()}: {order_error}")
+                print(f"[CLOSE ALL] ❌ Failed to close {symbol} {side.upper()}: {order_error}")
+            
+            time.sleep(0.5)  # Small delay between closes
+        
+        # Send final summary message
+        summary_msg = f"🛑 *CLOSE ALL POSITIONS - COMPLETE*\n\n"
+        summary_msg += f"✅ Successfully Closed: `{closed_count}`\n"
+        summary_msg += f"❌ Failed: `{failed_count}`\n\n"
+        summary_msg += "*Results:*\n"
+        for result in close_results:
+            summary_msg += f"{result}\n"
+        
+        self.send_telegram_message(summary_msg)
+        print(f"[CLOSE ALL] Completed: {closed_count} closed, {failed_count} failed")
 
     # ========== Risk Management ==========
     def monitor_positions(self):
