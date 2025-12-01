@@ -228,6 +228,7 @@ class AutoTradeBot:
         # Start background threads
         threading.Thread(target=self.strategy_loop, daemon=True).start()
         threading.Thread(target=self.monitor_positions, daemon=True).start()
+        threading.Thread(target=self.process_message_queue, daemon=True).start()
     
     def set_telegram_app(self, app):
         """Set the telegram application after it's created"""
@@ -274,6 +275,40 @@ class AutoTradeBot:
             'message': message,
             'chat_id': authorized_chat_id
         })
+    
+    def process_message_queue(self):
+        """Background thread to process message queue and send Telegram messages"""
+        print("[TELEGRAM] Starting message queue processor...")
+        # Create a new event loop for this thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        while self.running:
+            try:
+                # Wait for a message in the queue (with timeout to check if still running)
+                try:
+                    msg_data = self.message_queue.get(timeout=1)
+                except:
+                    continue  # Timeout, check if still running
+                
+                if not self.telegram_app:
+                    print(f"[TELEGRAM] App not initialized, skipping message")
+                    continue
+                
+                message = msg_data['message']
+                chat_id = msg_data['chat_id']
+                
+                # Send the message using the thread's event loop
+                try:
+                    loop.run_until_complete(self.send_telegram_message_async(message, chat_id))
+                except Exception as e:
+                    print(f"[TELEGRAM] Error sending message: {e}")
+                    
+            except Exception as e:
+                print(f"[TELEGRAM] Error in message queue processor: {e}")
+                time.sleep(1)
+        
+        loop.close()
 
     async def send_telegram_message_async(self, message, chat_id=AUTHORIZED_CHAT_ID):
         """Async method to send Telegram message - always uses authorized chat_id"""
@@ -1554,9 +1589,9 @@ Use the buttons below to control the bot or type /help for more information.
                         round(trade['exit_price'], 4) if trade['exit_price'] else '',
                         round(trade['size'], 2),
                         trade['status'],
-                        round(trade['fee'], 2),
-                        round(trade['ideal_pnl'], 2),
-                        round(trade.get('pnl', 0), 2),
+                        round(trade['fee'], 4),
+                        round(trade['ideal_pnl'], 4),
+                        round(trade.get('pnl', 0), 4),
                         trade['reason'],
                         round(trade['stop_loss'], 4),
                         round(trade['take_profit'], 4),
