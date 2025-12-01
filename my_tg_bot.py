@@ -12,7 +12,7 @@ import bitget.v2.mix.account_api as maxAccountApi
 import bitget.v2.mix.market_api as maxMarketApi
 import bitget.v2.mix.order_api as maxOrderApi
 
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 import asyncio
 
@@ -167,6 +167,12 @@ class AutoTradeBot:
         self.balance = self.fetch_real_balance()
         self.initial_balance = self.balance if self.balance is not None else 100.0
         
+        # User state management for symbol selection
+        self.user_states = {}  # {chat_id: {'action': 'open_long', 'symbol': None}}
+        
+        # User state management for symbol selection
+        self.user_states = {}  # {chat_id: {'action': 'open_long', 'symbol': None}}
+        
         # Set leverage for all symbols
         for symbol in TRADING_SYMBOLS:
             self.set_leverage(LEVERAGE, symbol)
@@ -238,6 +244,21 @@ class AutoTradeBot:
             [KeyboardButton("🔴 Close Long"), KeyboardButton("🔴 Close Short")],
         ]
         return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    
+    def get_symbol_keyboard(self, action_type, filter_symbols=None):
+        """Create inline keyboard for symbol selection
+        filter_symbols: if provided, only show these symbols (e.g., only symbols with open positions)
+        """
+        symbols_to_show = filter_symbols if filter_symbols else TRADING_SYMBOLS
+        keyboard = []
+        row = []
+        for i, symbol in enumerate(symbols_to_show):
+            row.append(InlineKeyboardButton(symbol, callback_data=f"{action_type}_{symbol}"))
+            if len(row) == 2 or i == len(symbols_to_show) - 1:
+                keyboard.append(row)
+                row = []
+        keyboard.append([InlineKeyboardButton("❌ Cancel", callback_data="cancel")])
+        return InlineKeyboardMarkup(keyboard)
 
     # ========== Telegram Message System ==========
     def send_telegram_message(self, message, chat_id=None):
@@ -520,52 +541,70 @@ Use the buttons below to control the bot or type /help for more information.
             
         elif message_text == "📈 Open Long":
             await update.message.reply_text(
-                "🔄 Opening LONG position...",
-                reply_markup=self.get_main_keyboard()
+                "📈 *Select symbol for LONG position:*",
+                reply_markup=self.get_symbol_keyboard("open_long"),
+                parse_mode='Markdown'
             )
-            self.open_position('long', chat_id)
             
         elif message_text == "📉 Open Short":
             await update.message.reply_text(
-                "🔄 Opening SHORT position...",
-                reply_markup=self.get_main_keyboard()
+                "📉 *Select symbol for SHORT position:*",
+                reply_markup=self.get_symbol_keyboard("open_short"),
+                parse_mode='Markdown'
             )
-            self.open_position('short', chat_id)
             
         elif message_text == "🔴 Close Long":
-            # Find first available long position
-            found = False
+            # Check if there are any open long positions
+            open_symbols = []
             for symbol in TRADING_SYMBOLS:
                 if self.symbol_data[symbol]['long_position']:
-                    await update.message.reply_text(
-                        f"🔄 Closing {symbol} LONG position...",
-                        reply_markup=self.get_main_keyboard()
-                    )
-                    self.close_position('long', "manual_close", chat_id, symbol)
-                    found = True
-                    break
-            if not found:
+                    open_symbols.append(symbol)
+            
+            if not open_symbols:
                 await update.message.reply_text(
-                    "❌ No LONG position to close",
+                    "❌ No LONG positions to close",
                     reply_markup=self.get_main_keyboard()
+                )
+            elif len(open_symbols) == 1:
+                # Only one position, close it directly
+                await update.message.reply_text(
+                    f"🔄 Closing {open_symbols[0]} LONG position...",
+                    reply_markup=self.get_main_keyboard()
+                )
+                self.close_position('long', "manual_close", chat_id, open_symbols[0])
+            else:
+                # Multiple positions, show selection - only show symbols with open positions
+                await update.message.reply_text(
+                    "🔴 *Select symbol to close LONG position:*",
+                    reply_markup=self.get_symbol_keyboard("close_long", open_symbols),
+                    parse_mode='Markdown'
                 )
                 
         elif message_text == "🔴 Close Short":
-            # Find first available short position
-            found = False
+            # Check if there are any open short positions
+            open_symbols = []
             for symbol in TRADING_SYMBOLS:
                 if self.symbol_data[symbol]['short_position']:
-                    await update.message.reply_text(
-                        f"🔄 Closing {symbol} SHORT position...",
-                        reply_markup=self.get_main_keyboard()
-                    )
-                    self.close_position('short', "manual_close", chat_id, symbol)
-                    found = True
-                    break
-            if not found:
+                    open_symbols.append(symbol)
+            
+            if not open_symbols:
                 await update.message.reply_text(
-                    "❌ No SHORT position to close",
+                    "❌ No SHORT positions to close",
                     reply_markup=self.get_main_keyboard()
+                )
+            elif len(open_symbols) == 1:
+                # Only one position, close it directly
+                await update.message.reply_text(
+                    f"🔄 Closing {open_symbols[0]} SHORT position...",
+                    reply_markup=self.get_main_keyboard()
+                )
+                self.close_position('short', "manual_close", chat_id, open_symbols[0])
+            else:
+                # Multiple positions, show selection - only show symbols with open positions
+                await update.message.reply_text(
+                    "🔴 *Select symbol to close SHORT position:*",
+                    reply_markup=self.get_symbol_keyboard("close_short", open_symbols),
+                    parse_mode='Markdown'
                 )
                 
         elif message_text == "📋 Positions":
@@ -633,44 +672,126 @@ Use the buttons below to control the bot or type /help for more information.
                 reply_markup=self.get_main_keyboard()
             )
         elif message_text == "Half Close Long":
-            # Find first available long position
-            found = False
+            # Check if there are any open long positions
+            open_symbols = []
             for symbol in TRADING_SYMBOLS:
                 if self.symbol_data[symbol]['long_position']:
-                    await update.message.reply_text(
-                        f"Halving {symbol} LONG position…",
-                        reply_markup=self.get_main_keyboard()
-                    )
-                    self.close_half_position('long', chat_id, symbol)
-                    found = True
-                    break
-            if not found:
+                    open_symbols.append(symbol)
+            
+            if not open_symbols:
                 await update.message.reply_text(
-                    "No LONG position to half-close",
+                    "❌ No LONG positions to half-close",
                     reply_markup=self.get_main_keyboard()
                 )
+            elif len(open_symbols) == 1:
+                # Only one position, half close it directly
+                await update.message.reply_text(
+                    f"Halving {open_symbols[0]} LONG position…",
+                    reply_markup=self.get_main_keyboard()
+                )
+                self.close_half_position('long', chat_id, open_symbols[0])
+            else:
+                # Multiple positions, show selection - only show symbols with open positions
+                await update.message.reply_text(
+                    "🔵 *Select symbol to half-close LONG position:*",
+                    reply_markup=self.get_symbol_keyboard("half_close_long", open_symbols),
+                    parse_mode='Markdown'
+                )
         elif message_text == "Half Close Short":
-            # Find first available short position
-            found = False
+            # Check if there are any open short positions
+            open_symbols = []
             for symbol in TRADING_SYMBOLS:
                 if self.symbol_data[symbol]['short_position']:
-                    await update.message.reply_text(
-                        f"Halving {symbol} SHORT position…",
-                        reply_markup=self.get_main_keyboard()
-                    )
-                    self.close_half_position('short', chat_id, symbol)
-                    found = True
-                    break
-            if not found:
+                    open_symbols.append(symbol)
+            
+            if not open_symbols:
                 await update.message.reply_text(
-                    "No SHORT position to half-close",
+                    "❌ No SHORT positions to half-close",
                     reply_markup=self.get_main_keyboard()
+                )
+            elif len(open_symbols) == 1:
+                # Only one position, half close it directly
+                await update.message.reply_text(
+                    f"Halving {open_symbols[0]} SHORT position…",
+                    reply_markup=self.get_main_keyboard()
+                )
+                self.close_half_position('short', chat_id, open_symbols[0])
+            else:
+                # Multiple positions, show selection - only show symbols with open positions
+                await update.message.reply_text(
+                    "🔵 *Select symbol to half-close SHORT position:*",
+                    reply_markup=self.get_symbol_keyboard("half_close_short", open_symbols),
+                    parse_mode='Markdown'
                 )
         else:
             await update.message.reply_text(
                 "❌ Unknown command. Use the buttons below or type /help for available commands.",
                 reply_markup=self.get_main_keyboard()
             )
+    
+    async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle callback queries from inline keyboard buttons"""
+        query = update.callback_query
+        await query.answer()
+        
+        chat_id = str(query.from_user.id)
+        
+        # Check authorization
+        if not self.is_authorized(chat_id):
+            await query.edit_message_text("❌ Unauthorized access. This bot is restricted to authorized users only.")
+            return
+        
+        callback_data = query.data
+        
+        if callback_data == "cancel":
+            await query.edit_message_text("❌ Operation cancelled.", reply_markup=None)
+            return
+        
+        # Parse callback data format: action_direction_symbol or action_symbol
+        # Examples: "open_long_ETHUSDT", "close_short_SOLUSDT", "half_close_long_TAOUSDT"
+        parts = callback_data.split("_")
+        
+        if len(parts) < 2:
+            await query.edit_message_text("❌ Invalid selection.", reply_markup=None)
+            return
+        
+        action = parts[0]
+        symbol = parts[-1]  # Last part is always the symbol
+        
+        if symbol not in TRADING_SYMBOLS:
+            await query.edit_message_text(f"❌ Invalid symbol: {symbol}", reply_markup=None)
+            return
+        
+        # Execute the action based on callback data
+        if action == "open":
+            # open_long_SYMBOL or open_short_SYMBOL
+            direction = parts[1]  # "long" or "short"
+            await query.edit_message_text(
+                f"🔄 Opening {symbol} {direction.upper()} position...",
+                reply_markup=None
+            )
+            self.open_position(direction, chat_id, symbol)
+            
+        elif action == "close":
+            # close_long_SYMBOL or close_short_SYMBOL
+            direction = parts[1]  # "long" or "short"
+            await query.edit_message_text(
+                f"🔄 Closing {symbol} {direction.upper()} position...",
+                reply_markup=None
+            )
+            self.close_position(direction, "manual_close", chat_id, symbol)
+            
+        elif action == "half":
+            # half_close_long_SYMBOL or half_close_short_SYMBOL
+            direction = parts[2]  # "long" or "short"
+            await query.edit_message_text(
+                f"Halving {symbol} {direction.upper()} position…",
+                reply_markup=None
+            )
+            self.close_half_position(direction, chat_id, symbol)
+            
+        else:
+            await query.edit_message_text("❌ Unknown action.", reply_markup=None)
 
     def fetch_real_balance(self):
         """Fetch actual USDT available balance from Bitget Futures account"""
@@ -1489,6 +1610,7 @@ def main():
     application.add_handler(CommandHandler("start", trading_bot.handle_start))
     application.add_handler(CommandHandler("help", trading_bot.handle_help))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, trading_bot.handle_message))
+    application.add_handler(CallbackQueryHandler(trading_bot.handle_callback))
     
     print("🤖 Starting Trading Bot with Telegram control...")
     print("✅ Trading strategies are running in background")
