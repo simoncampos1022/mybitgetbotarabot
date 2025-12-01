@@ -229,7 +229,7 @@ class AutoTradeBot:
         # Start background threads
         threading.Thread(target=self.strategy_loop, daemon=True).start()
         threading.Thread(target=self.monitor_positions, daemon=True).start()
-        # threading.Thread(target=self.process_message_queue, daemon=True).start()
+        threading.Thread(target=self.process_message_queue, daemon=True).start()
     
     def set_telegram_app(self, app):
         """Set the telegram application after it's created"""
