@@ -16,33 +16,115 @@ from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 import asyncio
 
-TAOUSDT_SYMBOL = "TAOUSDT"
 PRODUCT_TYPE = "USDT-FUTURES"
 MARGIN_COIN = "USDT"
 MARGIN_MODE = "isolated"
-CSV_FILE = "my_bitget_tao_history.csv"
+CSV_FILE = "my_bitget_history.csv"
 
-TELEGRAM_BOT_TOKEN = "8450626645:AAFA13SAXi461H56dDqRjbh-ZyE8IGuguIo"
+TELEGRAM_BOT_TOKEN = "8321838467:AAG4s4t8C0Wux71TIq-Dx86NsC0wk3uE6E8"
+AUTHORIZED_CHAT_ID = "7839829083"  # Only this chat ID can use the bot
 
 LEVERAGE = 5
-POSITION_SIZE_RATIO = 0.4
+POSITION_SIZE_RATIO = 0.1
 INTERVAL = "1H"
 FEE_PERCENT = 0.0006
 ATR_LENGTH = 14
 FS_LENGTH = 10
 RSI_LENGTH = 14
 
-LONG_FS_ENTRY_LEVEL = 4.8
-LONG_RSI_ENTRY_LEVEL = 13.0
-LONG_STOP_LOSS_LEVEL = 2.6
-LONG_TAKE_PROFIT_LEVEL = 1.8
-LONG_SECOND_SL_LEVEL = 0.1
+# Symbol Configuration
+# Each symbol has: parameters (10 levels) and operators (6 operators: 3 for long, 3 for short)
+# Operators: '>', '<', '>=', '<=', '==', '!='
+# Format: (rsi_operator, fs_operator, vol_operator)
+SYMBOL_CONFIG = {
+    "ETHUSDT": {
+        "long_fs_entry_level": 1.9,
+        "long_rsi_entry_level": 29.0,
+        "long_stop_loss_level": 3.0,
+        "long_take_profit_level": 2.9,
+        "long_second_sl_level": 0.7,
+        "long_operators": ("<", ">", ">"),  # (rsi_op, fs_op, vol_op)
+        "short_fs_entry_level": 4.2,
+        "short_rsi_entry_level": 26.0,
+        "short_stop_loss_level": 1.7,
+        "short_take_profit_level": 0.2,
+        "short_second_sl_level": 0.1,
+        "short_operators": ("<", "<", ">"),  # (rsi_op, fs_op, vol_op)
+    },
+    "SOLUSDT": {
+        "long_fs_entry_level": 3.2,
+        "long_rsi_entry_level": 9.0,
+        "long_stop_loss_level": 2.4,
+        "long_take_profit_level": 2.3,
+        "long_second_sl_level": 0.2,
+        "long_operators": ("<", "<", ">"),  # (rsi_op, fs_op, vol_op)
+        "short_fs_entry_level": 1.6,
+        "short_rsi_entry_level": 1.0,
+        "short_stop_loss_level": 1.5,
+        "short_take_profit_level": 1.8,
+        "short_second_sl_level": 2.9,
+        "short_operators": (">", "<", ">"),  # (rsi_op, fs_op, vol_op)
+    },
+    "TAOUSDT": {
+        "long_fs_entry_level": 4.8,
+        "long_rsi_entry_level": 13.0,
+        "long_stop_loss_level": 2.6,
+        "long_take_profit_level": 1.8,
+        "long_second_sl_level": 0.1,
+        "long_operators": (">", "<", ">"),  # (rsi_op, fs_op, vol_op)
+        "short_fs_entry_level": 2.5,
+        "short_rsi_entry_level": 2.0,
+        "short_stop_loss_level": 3.0,
+        "short_take_profit_level": 1.7,
+        "short_second_sl_level": 0.1,
+        "short_operators": (">", "<", ">"),  # (rsi_op, fs_op, vol_op)
+    },
+    "LINKUSDT": {
+        "long_fs_entry_level": 1.5,
+        "long_rsi_entry_level": 9.0,
+        "long_stop_loss_level": 3.0,
+        "long_take_profit_level": 3.0,
+        "long_second_sl_level": 1.3,
+        "long_operators": ("<", ">", ">"),  # (rsi_op, fs_op, vol_op)
+        "short_fs_entry_level": 2.0,
+        "short_rsi_entry_level": 10.0,
+        "short_stop_loss_level": 2.0,
+        "short_take_profit_level": 1.9,
+        "short_second_sl_level": 0.1,
+        "short_operators": ("<", "<", "<"),  # (rsi_op, fs_op, vol_op)
+    },
+    "SUSHIUSDT": {
+        "long_fs_entry_level": 1.9,
+        "long_rsi_entry_level": 11.0,
+        "long_stop_loss_level": 2.6,
+        "long_take_profit_level": 3.0,
+        "long_second_sl_level": 3.0,
+        "long_operators": ("<", ">", ">"),  # (rsi_op, fs_op, vol_op)
+        "short_fs_entry_level": 1.6,
+        "short_rsi_entry_level": 27.0,
+        "short_stop_loss_level": 1.8,
+        "short_take_profit_level": 3.0,
+        "short_second_sl_level": 0.1,
+        "short_operators": ("<", "<", "<"),  # (rsi_op, fs_op, vol_op)
+    },
+    "UNIUSDT": {
+        "long_fs_entry_level": 1.1,
+        "long_rsi_entry_level": 28.0,
+        "long_stop_loss_level": 2.9,
+        "long_take_profit_level": 1.1,
+        "long_second_sl_level": 0.1,
+        "long_operators": ("<", "<", ">"),  # (rsi_op, fs_op, vol_op)
+        "short_fs_entry_level": 4.7,
+        "short_rsi_entry_level": 1.0,
+        "short_stop_loss_level": 2.9,
+        "short_take_profit_level": 2.0,
+        "short_second_sl_level": 0.1,
+        "short_operators": (">", "<", ">"),  # (rsi_op, fs_op, vol_op)
+    },
+}
 
-SHORT_FS_ENTRY_LEVEL = 2.5
-SHORT_RSI_ENTRY_LEVEL = 2.0
-SHORT_STOP_LOSS_LEVEL = 3.0
-SHORT_TAKE_PROFIT_LEVEL = 1.7
-SHORT_SECOND_SL_LEVEL = 0.1
+# List of symbols to trade
+TRADING_SYMBOLS = list(SYMBOL_CONFIG.keys())
 
 class AutoTradeBot:
     def __init__(self):
@@ -50,9 +132,22 @@ class AutoTradeBot:
         self.running = True
         self.trade_lock = threading.Lock()
         self.price_lock = threading.Lock()
-        self.candles = []
-        self.fs = []
-        self.tr = []
+        
+        # Per-symbol data storage
+        self.symbol_data = {}
+        for symbol in TRADING_SYMBOLS:
+            self.symbol_data[symbol] = {
+                'candles': [],
+                'fs': [],
+                'tr': [],
+                'current_price': None,
+                'current_atr_value': 0.0,
+                'current_vol_os': 0.0,
+                'current_rsi_value': 0.0,
+                'long_position': None,
+                'short_position': None,
+            }
+        
         self.total_trades = 1
         self.trades = []
 
@@ -64,26 +159,26 @@ class AutoTradeBot:
         self.maxMarketApi = maxMarketApi.MarketApi(self.api_key, self.secret_key, self.passphrase)
         self.maxOrderApi = maxOrderApi.OrderApi(self.api_key, self.secret_key, self.passphrase)
 
-        self.current_price = None
         self.price_queue = Queue()
         self.price_update_event = threading.Event()
-        self.current_long_position = None
-        self.current_short_position = None
-        self.current_atr_value = 0.0
-        self.current_vol_os = 0.0
-        self.current_rsi_value = 0.0
         self.orderType = "market"
         self.telegram_app = None
         self.message_queue = Queue()
         self.balance = self.fetch_real_balance()
         self.initial_balance = self.balance if self.balance is not None else 100.0
-        self.set_leverage(LEVERAGE)
+        
+        # Set leverage for all symbols
+        for symbol in TRADING_SYMBOLS:
+            self.set_leverage(LEVERAGE, symbol)
 
-        self.current_price = self.get_current_price()
-        if self.current_price is None:
-            print("[INIT] Initial price from REST: None")
-        else:
-            print(f"[INIT] Initial price from REST: ${self.current_price:.2f}")
+        # Initialize prices for all symbols
+        for symbol in TRADING_SYMBOLS:
+            price = self.get_current_price(symbol)
+            if price is None:
+                print(f"[INIT] Initial price from REST for {symbol}: None")
+            else:
+                print(f"[INIT] Initial price from REST for {symbol}: ${price:.2f}")
+                self.symbol_data[symbol]['current_price'] = price
         
         # Load existing trades from CSV
         if os.path.exists(CSV_FILE):
@@ -91,7 +186,9 @@ class AutoTradeBot:
                 with open(CSV_FILE, 'r') as f:
                     reader = csv.DictReader(f)
                     for row in reader:
+                        symbol = row.get('symbol', TRADING_SYMBOLS[0])  # Default to first symbol for old data
                         trade_data = {
+                            'symbol': symbol,
                             'entry_time': row['entry_time'],
                             'exit_time': row['exit_time'],
                             'action': row['action'],
@@ -114,11 +211,11 @@ class AutoTradeBot:
                         self.total_trades = len(self.trades)
                         
                         # Restore open positions
-                        if trade_data['status'] == 'open':
+                        if trade_data['status'] == 'open' and symbol in self.symbol_data:
                             if trade_data['action'] == 'long':
-                                self.current_long_position = trade_data
+                                self.symbol_data[symbol]['long_position'] = trade_data
                             elif trade_data['action'] == 'short':
-                                self.current_short_position = trade_data
+                                self.symbol_data[symbol]['short_position'] = trade_data
             except Exception as e:
                 print(f"[INIT] Error loading trades from CSV: {e}")
 
@@ -144,59 +241,74 @@ class AutoTradeBot:
 
     # ========== Telegram Message System ==========
     def send_telegram_message(self, message, chat_id=None):
-        """Queue a message to be sent via Telegram - thread-safe version"""
+        """Queue a message to be sent via Telegram - always uses authorized chat_id"""
         if not self.telegram_app:
             print(f"[TELEGRAM] App not initialized: {message}")
             return
+        
+        # Always use authorized chat_id for security
+        authorized_chat_id = AUTHORIZED_CHAT_ID
             
         self.message_queue.put({
             'message': message,
-            'chat_id': chat_id
+            'chat_id': authorized_chat_id
         })
 
     async def send_telegram_message_async(self, message, chat_id=None):
-        """Async method to send Telegram message"""
+        """Async method to send Telegram message - always uses authorized chat_id"""
         try:
-            if chat_id:
-                await self.telegram_app.bot.send_message(
-                    chat_id=chat_id,
-                    text=message,
-                    reply_markup=self.get_main_keyboard(),
-                    parse_mode='Markdown'
-                )
-                print(f"[TELEGRAM] Message sent to {chat_id}")
-            else:
-                print(f"[TELEGRAM] No chat_id provided for: {message}")
+            # Always use authorized chat_id for security
+            authorized_chat_id = AUTHORIZED_CHAT_ID
+            await self.telegram_app.bot.send_message(
+                chat_id=authorized_chat_id,
+                text=message,
+                reply_markup=self.get_main_keyboard(),
+                parse_mode='Markdown'
+            )
+            print(f"[TELEGRAM] Message sent to authorized chat {authorized_chat_id}")
         except Exception as e:
             print(f"[TELEGRAM ASYNC] Error sending message: {e}")
+    
+    def is_authorized(self, chat_id):
+        """Check if the chat_id is authorized"""
+        return str(chat_id) == AUTHORIZED_CHAT_ID
 
     def get_status_message(self):
-        """Generate comprehensive status message"""
-        current_price = self.get_current_price()
-        price_msg = f"${current_price:.2f}" if current_price else "N/A"
+        """Generate comprehensive status message for all symbols"""
+        position_info = "📊 *Open Positions:*\n"
+        has_positions = False
         
-        # Position info
-        long_pos = self.current_long_position
-        short_pos = self.current_short_position
+        for symbol in TRADING_SYMBOLS:
+            data = self.symbol_data[symbol]
+            long_pos = data['long_position']
+            short_pos = data['short_position']
+            
+            if long_pos or short_pos:
+                has_positions = True
+                position_info += f"\n*{symbol}:*\n"
+                if long_pos:
+                    position_info += f"📈 LONG: ${long_pos['entry_price']:.2f} | SL: ${long_pos['stop_loss']:.2f} | TP: ${long_pos['take_profit']:.2f}\n"
+                if short_pos:
+                    position_info += f"📉 SHORT: ${short_pos['entry_price']:.2f} | SL: ${short_pos['stop_loss']:.2f} | TP: ${short_pos['take_profit']:.2f}\n"
         
-        position_info = ""
-        if long_pos:
-            position_info += f"📈 LONG: ${long_pos['entry_price']:.2f} | SL: ${long_pos['stop_loss']:.2f} | TP: ${long_pos['take_profit']:.2f}\n"
-        if short_pos:
-            position_info += f"📉 SHORT: ${short_pos['entry_price']:.2f} | SL: ${short_pos['stop_loss']:.2f} | TP: ${short_pos['take_profit']:.2f}\n"
-        if not long_pos and not short_pos:
-            position_info = "📊 No open positions\n"
+        if not has_positions:
+            position_info = "📊 *No open positions*\n"
         
-        # Indicators
-        indicators_info = f"""
-📊 Current Indicators:
-• Price: {price_msg}
-• ATR: {self.current_atr_value:.2f}
-• Volume Osc: {self.current_vol_os:.2f}%
-• RSI: {self.current_rsi_value:.2f}
-• FS: {self.fs[-1] if self.fs else 0:.2f}
-• TR: {self.tr[-1] if self.tr else 0:.2f}
-        """
+        # Indicators for all symbols
+        indicators_info = "\n📊 *Current Indicators:*\n"
+        for symbol in TRADING_SYMBOLS:
+            data = self.symbol_data[symbol]
+            price = data['current_price']
+            price_msg = f"${price:.2f}" if price else "N/A"
+            indicators_info += f"\n*{symbol}:*\n"
+            indicators_info += f"• Price: {price_msg}\n"
+            indicators_info += f"• ATR: {data['current_atr_value']:.2f}\n"
+            indicators_info += f"• Volume Osc: {data['current_vol_os']:.2f}%\n"
+            indicators_info += f"• RSI: {data['current_rsi_value']:.2f}\n"
+            if data['fs']:
+                indicators_info += f"• FS: {data['fs'][-1]:.2f}\n"
+            if data['tr']:
+                indicators_info += f"• TR: {data['tr'][-1]:.2f}\n"
         
         # Performance
         closed_trades = [t for t in self.trades if t['status'] == 'closed']
@@ -205,15 +317,15 @@ class AutoTradeBot:
         win_rate = (win_trades / len(closed_trades)) * 100 if closed_trades else 0
         
         performance_info = f"""
-💰 Performance:
-• Balance: ${self.balance:.2f}
-• Total PNL: ${total_pnl:.2f}
-• Total Trades: {len(closed_trades)}
-• Win Rate: {win_rate:.1f}%
-• Open Positions: {len([t for t in self.trades if t['status'] == 'open'])}
+💰 *Performance:*
+• Balance: `${self.balance:.2f}`
+• Total PNL: `${total_pnl:.2f}`
+• Total Trades: `{len(closed_trades)}`
+• Win Rate: `{win_rate:.1f}%`
+• Open Positions: `{len([t for t in self.trades if t['status'] == 'open'])}`
         """
         
-        return f"🤖 TRADING BOT STATUS\n\n{position_info}{indicators_info}{performance_info}"
+        return f"🤖 *MULTI-SYMBOL TRADING BOT STATUS*\n\n{position_info}{indicators_info}{performance_info}"
 
     def get_recent_history(self):
         """Get last 3 closed positions"""
@@ -226,10 +338,11 @@ class AutoTradeBot:
         history_msg = "📜 *Last 3 Closed Positions:*\n\n"
         
         for i, trade in enumerate(recent_trades, 1):
+            symbol = trade.get('symbol', 'N/A')
             pnl_percent = (trade['pnl'] / (trade['entry_price'] * trade['size'] / LEVERAGE)) * 100 if trade['entry_price'] * trade['size'] > 0 else 0
             
             history_msg += f"""
-*Trade {i}:*
+*Trade {i} ({symbol}):*
 • Action: `{trade['action'].upper()}`
 • Entry: `${trade['entry_price']:.2f}`
 • Exit: `${trade['exit_price']:.2f}`
@@ -301,12 +414,18 @@ class AutoTradeBot:
     # ========== Telegram Command Handlers ==========
     async def handle_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command"""
+        chat_id = str(update.effective_chat.id)
+        
+        if not self.is_authorized(chat_id):
+            await update.message.reply_text("❌ Unauthorized access. This bot is restricted to authorized users only.")
+            return
+        
         welcome_text = """
 🤖 Welcome to the Trading Bot!
 
 Use the buttons below to control the bot or type /help for more information.
 
-⚠️ Warning: This bot allows all users to control trading. Use with caution!
+✅ You are authorized to use this bot.
         """
         await update.message.reply_text(
             welcome_text,
@@ -315,6 +434,12 @@ Use the buttons below to control the bot or type /help for more information.
 
     async def handle_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /help command with buttons"""
+        chat_id = str(update.effective_chat.id)
+        
+        if not self.is_authorized(chat_id):
+            await update.message.reply_text("❌ Unauthorized access. This bot is restricted to authorized users only.")
+            return
+        
         help_text = """
 🤖 *Trading Bot Commands:*
 
@@ -339,7 +464,7 @@ Use the buttons below to control the bot or type /help for more information.
 • Automatic stop-loss/take-profit
 • Telegram notifications for all trades
 
-⚠️ *Note:* This bot is open to all users. Trade carefully!
+✅ *Authorized User Access Only*
 
 *Use the buttons below to control the bot:*
         """
@@ -351,9 +476,15 @@ Use the buttons below to control the bot or type /help for more information.
         )
 
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle button presses and text messages - OPEN TO ALL USERS"""
+        """Handle button presses and text messages - AUTHORIZED USERS ONLY"""
+        chat_id = str(update.effective_chat.id)
+        
+        # Check authorization first
+        if not self.is_authorized(chat_id):
+            await update.message.reply_text("❌ Unauthorized access. This bot is restricted to authorized users only.")
+            return
+        
         message_text = update.message.text
-        chat_id = update.effective_chat.id
 
         if message_text == "📊 Status":
             status_msg = self.get_status_message()
@@ -402,26 +533,36 @@ Use the buttons below to control the bot or type /help for more information.
             self.open_position('short', chat_id)
             
         elif message_text == "🔴 Close Long":
-            if self.current_long_position:
-                await update.message.reply_text(
-                    "🔄 Closing LONG position...",
-                    reply_markup=self.get_main_keyboard()
-                )
-                self.close_position('long', "manual_close", chat_id)
-            else:
+            # Find first available long position
+            found = False
+            for symbol in TRADING_SYMBOLS:
+                if self.symbol_data[symbol]['long_position']:
+                    await update.message.reply_text(
+                        f"🔄 Closing {symbol} LONG position...",
+                        reply_markup=self.get_main_keyboard()
+                    )
+                    self.close_position('long', "manual_close", chat_id, symbol)
+                    found = True
+                    break
+            if not found:
                 await update.message.reply_text(
                     "❌ No LONG position to close",
                     reply_markup=self.get_main_keyboard()
                 )
                 
         elif message_text == "🔴 Close Short":
-            if self.current_short_position:
-                await update.message.reply_text(
-                    "🔄 Closing SHORT position...",
-                    reply_markup=self.get_main_keyboard()
-                )
-                self.close_position('short', "manual_close", chat_id)
-            else:
+            # Find first available short position
+            found = False
+            for symbol in TRADING_SYMBOLS:
+                if self.symbol_data[symbol]['short_position']:
+                    await update.message.reply_text(
+                        f"🔄 Closing {symbol} SHORT position...",
+                        reply_markup=self.get_main_keyboard()
+                    )
+                    self.close_position('short', "manual_close", chat_id, symbol)
+                    found = True
+                    break
+            if not found:
                 await update.message.reply_text(
                     "❌ No SHORT position to close",
                     reply_markup=self.get_main_keyboard()
@@ -429,36 +570,46 @@ Use the buttons below to control the bot or type /help for more information.
                 
         elif message_text == "📋 Positions":
             positions_msg = "📋 *Current Positions:*\n\n"
+            has_positions = False
             
-            if self.current_long_position:
-                pos = self.current_long_position
-                unrealized_pnl = (self.get_current_price() - pos['entry_price']) * pos['size'] if self.get_current_price() else 0
-                positions_msg += f"""
-📈 *LONG Position:*
-• Entry Price: `${pos['entry_price']:.2f}`
-• Size: `{pos['size']:.2f}`
-• Stop Loss: `${pos['stop_loss']:.2f}`
-• Take Profit: `${pos['take_profit']:.2f}`
-• Unrealized PNL: `${unrealized_pnl:.2f}`
-• Trailing Stop: `{'Active' if pos.get('trailing_stop_active', False) else 'Inactive'}`
-                """
-            else:
-                positions_msg += "📈 *LONG Position:* No position\n"
+            for symbol in TRADING_SYMBOLS:
+                data = self.symbol_data[symbol]
+                long_pos = data['long_position']
+                short_pos = data['short_position']
                 
-            if self.current_short_position:
-                pos = self.current_short_position
-                unrealized_pnl = (pos['entry_price'] - self.get_current_price()) * pos['size'] if self.get_current_price() else 0
-                positions_msg += f"""
-📉 *SHORT Position:*
-• Entry Price: `${pos['entry_price']:.2f}`
-• Size: `{pos['size']:.2f}`
-• Stop Loss: `${pos['stop_loss']:.2f}`
-• Take Profit: `${pos['take_profit']:.2f}`
+                if long_pos or short_pos:
+                    has_positions = True
+                    positions_msg += f"*{symbol}:*\n"
+                    
+                    if long_pos:
+                        price = data['current_price']
+                        unrealized_pnl = (price - long_pos['entry_price']) * long_pos['size'] if price else 0
+                        positions_msg += f"""
+📈 *LONG Position:*
+• Entry Price: `${long_pos['entry_price']:.2f}`
+• Size: `{long_pos['size']:.2f}`
+• Stop Loss: `${long_pos['stop_loss']:.2f}`
+• Take Profit: `${long_pos['take_profit']:.2f}`
 • Unrealized PNL: `${unrealized_pnl:.2f}`
-• Trailing Stop: `{'Active' if pos.get('trailing_stop_active', False) else 'Inactive'}`
-                """
-            else:
-                positions_msg += "📉 *SHORT Position:* No position\n"
+• Trailing Stop: `{'Active' if long_pos.get('trailing_stop_active', False) else 'Inactive'}`
+                        """
+                    
+                    if short_pos:
+                        price = data['current_price']
+                        unrealized_pnl = (short_pos['entry_price'] - price) * short_pos['size'] if price else 0
+                        positions_msg += f"""
+📉 *SHORT Position:*
+• Entry Price: `${short_pos['entry_price']:.2f}`
+• Size: `{short_pos['size']:.2f}`
+• Stop Loss: `${short_pos['stop_loss']:.2f}`
+• Take Profit: `${short_pos['take_profit']:.2f}`
+• Unrealized PNL: `${unrealized_pnl:.2f}`
+• Trailing Stop: `{'Active' if short_pos.get('trailing_stop_active', False) else 'Inactive'}`
+                        """
+                    positions_msg += "\n"
+            
+            if not has_positions:
+                positions_msg = "📋 *No open positions*\n"
                 
             await update.message.reply_text(
                 positions_msg, 
@@ -482,25 +633,35 @@ Use the buttons below to control the bot or type /help for more information.
                 reply_markup=self.get_main_keyboard()
             )
         elif message_text == "Half Close Long":
-            if self.current_long_position:
-                await update.message.reply_text(
-                    "Halving LONG position…",
-                    reply_markup=self.get_main_keyboard()
-                )
-                self.close_half_position('long', chat_id)
-            else:
+            # Find first available long position
+            found = False
+            for symbol in TRADING_SYMBOLS:
+                if self.symbol_data[symbol]['long_position']:
+                    await update.message.reply_text(
+                        f"Halving {symbol} LONG position…",
+                        reply_markup=self.get_main_keyboard()
+                    )
+                    self.close_half_position('long', chat_id, symbol)
+                    found = True
+                    break
+            if not found:
                 await update.message.reply_text(
                     "No LONG position to half-close",
                     reply_markup=self.get_main_keyboard()
                 )
         elif message_text == "Half Close Short":
-            if self.current_short_position:
-                await update.message.reply_text(
-                    "Halving SHORT position…",
-                    reply_markup=self.get_main_keyboard()
-                )
-                self.close_half_position('short', chat_id)
-            else:
+            # Find first available short position
+            found = False
+            for symbol in TRADING_SYMBOLS:
+                if self.symbol_data[symbol]['short_position']:
+                    await update.message.reply_text(
+                        f"Halving {symbol} SHORT position…",
+                        reply_markup=self.get_main_keyboard()
+                    )
+                    self.close_half_position('short', chat_id, symbol)
+                    found = True
+                    break
+            if not found:
                 await update.message.reply_text(
                     "No SHORT position to half-close",
                     reply_markup=self.get_main_keyboard()
@@ -538,53 +699,58 @@ Use the buttons below to control the bot or type /help for more information.
             print(f"[BALANCE 🔴] Error fetching balance: {e}")
             return None
 
-    def set_leverage(self, leverage=10):
-        """Set leverage for TAOUSDT USDT-FUTURES"""
+    def set_leverage(self, leverage=10, symbol=None):
+        """Set leverage for a symbol in USDT-FUTURES"""
+        if symbol is None:
+            symbol = TRADING_SYMBOLS[0]
         try:
             params = {
-                "symbol": TAOUSDT_SYMBOL,
+                "symbol": symbol,
                 "productType": PRODUCT_TYPE,
                 "marginCoin": MARGIN_COIN,
                 "leverage": str(leverage)
             }
             response = self.maxAccountApi.setLeverage(params)
             if response.get('code') == '00000':
-                print(f"[LEVERAGE 🟢] Successfully set to {leverage}x")
+                print(f"[LEVERAGE 🟢] {symbol} successfully set to {leverage}x")
             else:
-                print(f"[LEVERAGE 🔴] Failed: {response.get('msg')}")
+                print(f"[LEVERAGE 🔴] {symbol} failed: {response.get('msg')}")
         except Exception as e:
-            print(f"[LEVERAGE 🔴] Error setting leverage: {e}")
+            print(f"[LEVERAGE 🔴] {symbol} error setting leverage: {e}")
 
     # ========== Data Fetching & Indicators ==========
-    def get_current_price(self):
+    def get_current_price(self, symbol=None):
+        if symbol is None:
+            symbol = TRADING_SYMBOLS[0]
         try:
             params = {
-                "symbol": TAOUSDT_SYMBOL,
+                "symbol": symbol,
                 "productType": PRODUCT_TYPE,
             }
             response = self.maxMarketApi.tickers(params)
             
             if response['code'] != '00000':
-                print(f"[REST] API Error: {response['msg']}")
+                print(f"[REST] {symbol} API Error: {response['msg']}")
                 return None
                 
             for ticker in response['data']:
-                if ticker['symbol'] == TAOUSDT_SYMBOL:
+                if ticker['symbol'] == symbol:
                     price = float(ticker['lastPr'])
-                    print(f"[REST] Fetched price: ${price:.2f}")
+                    self.symbol_data[symbol]['current_price'] = round(price, 2)
                     return round(price, 2)
                     
-            print(f"[REST] TAOUSDT symbol not found in response")
+            print(f"[REST] {symbol} symbol not found in response")
             return None
             
         except Exception as e:
-            print(f"[REST] Price fetch error: {e}")
+            print(f"[REST] {symbol} price fetch error: {e}")
             return None
 
-    def fetch_candles(self, interval: str, limit: int):
-        
+    def fetch_candles(self, interval: str, limit: int, symbol=None):
+        if symbol is None:
+            symbol = TRADING_SYMBOLS[0]
         params = {
-            "symbol": TAOUSDT_SYMBOL,
+            "symbol": symbol,
             "productType": PRODUCT_TYPE,
             "granularity": interval,
             "limit": limit
@@ -593,7 +759,7 @@ Use the buttons below to control the bot or type /help for more information.
             response = self.maxMarketApi.history(params)
             
             if response['code'] != '00000':
-                print(f"[DATA] API Error: {response['msg']}")
+                print(f"[DATA] {symbol} API Error: {response['msg']}")
                 return None
                 
             data = response.get("data", [])
@@ -609,10 +775,10 @@ Use the buttons below to control the bot or type /help for more information.
                     "quote_volume": float(entry[6])
                 }
                 candles.append(candle)
-            print(f"[DATA] Fetched {len(candles)} {interval} candles")
+            print(f"[DATA] {symbol} Fetched {len(candles)} {interval} candles")
             return candles
         except Exception as e:
-            print(f"[DATA] Error fetching candles: {e}")
+            print(f"[DATA] {symbol} Error fetching candles: {e}")
             return None
         
     def calculate_atr(self, df, atr_length=14):
@@ -689,6 +855,9 @@ Use the buttons below to control the bot or type /help for more information.
         if not position:
             return
         
+        symbol = position.get('symbol', TRADING_SYMBOLS[0])
+        config = SYMBOL_CONFIG[symbol]
+        data = self.symbol_data[symbol]
         take_profit = position['take_profit']
 
         if 'max_profit_price' not in position:
@@ -701,46 +870,48 @@ Use the buttons below to control the bot or type /help for more information.
             if current_price > position['max_profit_price']:
                 position['max_profit_price'] = current_price
                 changed = True
-                print(f"[TRAILING STOP] New max profit price for LONG: ${position['max_profit_price']:.2f}")
+                print(f"[TRAILING STOP] {symbol} New max profit price for LONG: ${position['max_profit_price']:.2f}")
 
             if not position.get('half_exit_done', False) and current_price >= take_profit:
-                self.execute_half_exit(position, current_price)
+                self.execute_half_exit(position, current_price, None, symbol)
                 position['trailing_stop_active'] = True
                 changed = True
 
             if position['trailing_stop_active']:
-                trailing_stop_price = position['max_profit_price'] - (self.current_atr_value * LONG_SECOND_SL_LEVEL)
+                trailing_stop_price = position['max_profit_price'] - (data['current_atr_value'] * config['long_second_sl_level'])
                 if trailing_stop_price > position['stop_loss']:
                     position['stop_loss'] = trailing_stop_price
                     changed = True
-                    print(f"[TRAILING STOP] Updated stop loss for LONG: ${position['stop_loss']:.2f}")
+                    print(f"[TRAILING STOP] {symbol} Updated stop loss for LONG: ${position['stop_loss']:.2f}")
 
         else:  # short
             if current_price < position['max_profit_price']:
                 position['max_profit_price'] = current_price
                 changed = True
-                print(f"[TRAILING STOP] New max profit price for SHORT: ${position['max_profit_price']:.2f}")
+                print(f"[TRAILING STOP] {symbol} New max profit price for SHORT: ${position['max_profit_price']:.2f}")
 
             if not position.get('half_exit_done', False) and current_price <= take_profit:
-                self.execute_half_exit(position, current_price)
+                self.execute_half_exit(position, current_price, None, symbol)
                 position['trailing_stop_active'] = True
                 changed = True
 
             if position['trailing_stop_active']:
-                trailing_stop_price = position['max_profit_price'] + (self.current_atr_value * SHORT_SECOND_SL_LEVEL)
+                trailing_stop_price = position['max_profit_price'] + (data['current_atr_value'] * config['short_second_sl_level'])
                 if trailing_stop_price < position['stop_loss']:
                     position['stop_loss'] = trailing_stop_price
                     changed = True
-                    print(f"[TRAILING STOP] Updated stop loss for SHORT: ${position['stop_loss']:.2f}")
+                    print(f"[TRAILING STOP] {symbol} Updated stop loss for SHORT: ${position['stop_loss']:.2f}")
 
         if changed:
             self.save_trades()
 
-    def execute_half_exit(self, position, current_price, chat_id=None):
+    def execute_half_exit(self, position, current_price, chat_id=None, symbol=None):
         """Execute half position exit and update position size"""
+        if symbol is None:
+            symbol = position.get('symbol', TRADING_SYMBOLS[0])
         with self.trade_lock:
             if position.get('half_exit_done', False):
-                print(f"[HALF EXIT] Half exit already executed for {position['action'].upper()} position")
+                print(f"[HALF EXIT] {symbol} Half exit already executed for {position['action'].upper()} position")
                 return
 
             if 'original_size' not in position:
@@ -760,6 +931,7 @@ Use the buttons below to control the bot or type /help for more information.
             self.balance += net_pnl
 
             half_trade = {
+                'symbol': symbol,
                 'entry_time': position['entry_time'],
                 'exit_time': datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
                 'action': position['action'],
@@ -785,9 +957,9 @@ Use the buttons below to control the bot or type /help for more information.
 
             self.trades.append(half_trade)
 
-            self.send_order(f'exit_{position["action"]}', current_price, half_size, 50)
+            self.send_order(f'exit_{position["action"]}', current_price, half_size, 50, symbol)
 
-            self.send_telegram_message(f"[HALF EXIT] 🔵 Executed half exit for {position['action'].upper()} position | "
+            self.send_telegram_message(f"[HALF EXIT] 🔵 {symbol} Executed half exit for {position['action'].upper()} position | "
                   f"Exit Price: ${current_price:.2f} | "
                   f"Half Size: {half_size:.2f} | "
                   f"Remaining Size: {remaining_size:.2f} | "
@@ -795,7 +967,7 @@ Use the buttons below to control the bot or type /help for more information.
                   chat_id
                   )
             
-            print(f"[HALF EXIT] 🔵 Executed half exit for {position['action'].upper()} position | "
+            print(f"[HALF EXIT] 🔵 {symbol} Executed half exit for {position['action'].upper()} position | "
                   f"Exit Price: ${current_price:.2f} | "
                   f"Half Size: {half_size:.2f} | "
                   f"Remaining Size: {remaining_size:.2f} | "
@@ -803,108 +975,163 @@ Use the buttons below to control the bot or type /help for more information.
 
             self.save_trades()
 
-    def update_indicators(self):
-        new_candles = self.fetch_candles(INTERVAL, 200)
-        if not new_candles:
-            print("[DATA] No new candles fetched. Using existing data.")
+    def update_indicators(self, symbol=None):
+        if symbol is None:
+            # Update all symbols
+            for sym in TRADING_SYMBOLS:
+                self.update_indicators(sym)
             return
             
-        self.candles = sorted(new_candles, key=lambda x: x['timestamp'])
-        print(f"[INDICATORS] Updating with {len(self.candles)} candles")
+        new_candles = self.fetch_candles(INTERVAL, 200, symbol)
+        if not new_candles:
+            print(f"[DATA] {symbol} No new candles fetched. Using existing data.")
+            return
+            
+        candles = sorted(new_candles, key=lambda x: x['timestamp'])
+        print(f"[INDICATORS] {symbol} Updating with {len(candles)} candles")
 
-        df = pd.DataFrame(self.candles)
+        df = pd.DataFrame(candles)
 
         df = self.calculate_fs(df, FS_LENGTH)
         df = self.calculate_volume_oscillator(df)
         df = self.calculate_atr(df, ATR_LENGTH)
         df = self.calculate_rsi(df, RSI_LENGTH)
 
-        self.fs = df['fs'].tolist()
-        self.tr = df['tr'].tolist()
-        self.current_vol_os = df['vol_os'].iloc[-1]
-        self.current_atr_value = df['atr'].iloc[-1]
-        self.current_rsi_value = df['rsi'].iloc[-1]
+        self.symbol_data[symbol]['candles'] = candles
+        self.symbol_data[symbol]['fs'] = df['fs'].tolist()
+        self.symbol_data[symbol]['tr'] = df['tr'].tolist()
+        self.symbol_data[symbol]['current_vol_os'] = df['vol_os'].iloc[-1]
+        self.symbol_data[symbol]['current_atr_value'] = df['atr'].iloc[-1]
+        self.symbol_data[symbol]['current_rsi_value'] = df['rsi'].iloc[-1]
 
-        print(f"[INDICATORS] Updated FS: {self.fs[-1]:.2f}, TR: {self.tr[-1]:.2f}, "
-            f"VOL_OS: {self.current_vol_os:.2f}, ATR_VAL: {self.current_atr_value:.2f}, "
-            f"RSI_VALUE: {self.current_rsi_value:.2f}")
+        print(f"[INDICATORS] {symbol} Updated FS: {self.symbol_data[symbol]['fs'][-1]:.2f}, "
+            f"TR: {self.symbol_data[symbol]['tr'][-1]:.2f}, "
+            f"VOL_OS: {self.symbol_data[symbol]['current_vol_os']:.2f}, "
+            f"ATR_VAL: {self.symbol_data[symbol]['current_atr_value']:.2f}, "
+            f"RSI_VALUE: {self.symbol_data[symbol]['current_rsi_value']:.2f}")
 
     # ========== Trading Logic ==========
-    def check_signal(self, current_time: str):
-        if len(self.fs) < 3:
-            print("[SIGNAL] Not enough data to check signals")
+    def evaluate_condition(self, value, operator, threshold):
+        """Evaluate a condition with the given operator"""
+        if operator == '>':
+            return value > threshold
+        elif operator == '<':
+            return value < threshold
+        elif operator == '>=':
+            return value >= threshold
+        elif operator == '<=':
+            return value <= threshold
+        elif operator == '==':
+            return value == threshold
+        elif operator == '!=':
+            return value != threshold
+        else:
+            print(f"[SIGNAL] Unknown operator: {operator}, defaulting to >")
+            return value > threshold
+    
+    def check_signal(self, current_time: str, symbol=None):
+        if symbol is None:
+            # Check signals for all symbols
+            for sym in TRADING_SYMBOLS:
+                self.check_signal(current_time, sym)
+            return
+            
+        data = self.symbol_data[symbol]
+        if len(data['fs']) < 3:
+            print(f"[SIGNAL] {symbol} Not enough data to check signals")
             return
         
-        fs_now = self.fs[-1]
-        tr_now = self.tr[-1]
-        print(f"[{current_time}] 1H indicator values now fs:{fs_now:.2f}, tr:{tr_now:.2f}")
+        fs_now = data['fs'][-1]
+        tr_now = data['tr'][-1]
+        print(f"[{current_time}] {symbol} 1H indicator values now fs:{fs_now:.2f}, tr:{tr_now:.2f}")
         
-        fs_prev = self.fs[-2]
-        tr_prev = self.tr[-2]
-        print(f"[{current_time}] 1H indicator values prev fs:{fs_prev:.2f}, tr:{tr_prev:.2f}")
+        fs_prev = data['fs'][-2]
+        tr_prev = data['tr'][-2]
+        print(f"[{current_time}] {symbol} 1H indicator values prev fs:{fs_prev:.2f}, tr:{tr_prev:.2f}")
 
         fs_cross_up = (fs_prev < tr_prev) and (fs_now > tr_now)
         fs_cross_down = (fs_prev > tr_prev) and (fs_now < tr_now)
 
-        current_price = self.get_current_price()
+        current_price = self.get_current_price(symbol)
         if current_price is None:
-            print("[SIGNAL] Cannot get current price, skipping signal check")
+            print(f"[SIGNAL] {symbol} Cannot get current price, skipping signal check")
             return
 
         if fs_cross_up:
-            print(f"UP cross is detected!")
+            print(f"{symbol} UP cross is detected!")
         if fs_cross_down:
-            print(f"DOWN cross is detected!")
+            print(f"{symbol} DOWN cross is detected!")
+        
+        config = SYMBOL_CONFIG[symbol]
         
         if fs_cross_up:
-            cond_entry = abs(self.current_rsi_value - 50) > LONG_RSI_ENTRY_LEVEL
-            cond_entry_fs = max(abs(tr_now), abs(fs_now)) < LONG_FS_ENTRY_LEVEL
-            cond_vol = self.current_vol_os > 0
+            # Long entry conditions with symbol-specific operators
+            rsi_op, fs_op, vol_op = config['long_operators']
+            rsi_value = abs(data['current_rsi_value'] - 50)
+            fs_value = max(abs(tr_now), abs(fs_now))
             
-            print(f"[SIGNAL] LONG Conditions - RSI: {cond_entry}, FS: {cond_entry_fs}, VOL: {cond_vol}")
+            cond_entry = self.evaluate_condition(rsi_value, rsi_op, config['long_rsi_entry_level'])
+            cond_entry_fs = self.evaluate_condition(fs_value, fs_op, config['long_fs_entry_level'])
+            cond_vol = self.evaluate_condition(data['current_vol_os'], vol_op, 0)
+            
+            print(f"[SIGNAL] {symbol} LONG Conditions - RSI: {cond_entry}, FS: {cond_entry_fs}, VOL: {cond_vol}")
             
             if cond_entry and cond_entry_fs and cond_vol:
-                if self.current_long_position:
-                    if current_price < self.current_long_position['entry_price']:
-                        self.close_position('long', "Replace")
-                        self.open_position('long')
+                long_pos = data['long_position']
+                if long_pos:
+                    if current_price < long_pos['entry_price']:
+                        self.close_position('long', "Replace", symbol)
+                        self.open_position('long', None, symbol)
                     else:
                         pass
                 else:
-                    self.open_position('long')
+                    self.open_position('long', None, symbol)
                     
         elif fs_cross_down:
-            cond_entry = abs(self.current_rsi_value - 50) > SHORT_RSI_ENTRY_LEVEL
-            cond_entry_fs = max(abs(tr_now), abs(fs_now)) < SHORT_FS_ENTRY_LEVEL
-            cond_vol = self.current_vol_os > 0
+            # Short entry conditions with symbol-specific operators
+            rsi_op, fs_op, vol_op = config['short_operators']
+            rsi_value = abs(data['current_rsi_value'] - 50)
+            fs_value = max(abs(tr_now), abs(fs_now))
             
-            print(f"[SIGNAL] SHORT Conditions - RSI: {cond_entry}, FS: {cond_entry_fs}, VOL: {cond_vol}")
+            cond_entry = self.evaluate_condition(rsi_value, rsi_op, config['short_rsi_entry_level'])
+            cond_entry_fs = self.evaluate_condition(fs_value, fs_op, config['short_fs_entry_level'])
+            cond_vol = self.evaluate_condition(data['current_vol_os'], vol_op, 0)
+            
+            print(f"[SIGNAL] {symbol} SHORT Conditions - RSI: {cond_entry}, FS: {cond_entry_fs}, VOL: {cond_vol}")
             
             if cond_entry and cond_entry_fs and cond_vol:
-                if self.current_short_position:
-                    if current_price > self.current_short_position['entry_price']:
-                        self.close_position('short', "Replace")
-                        self.open_position('short')
+                short_pos = data['short_position']
+                if short_pos:
+                    if current_price > short_pos['entry_price']:
+                        self.close_position('short', "Replace", symbol)
+                        self.open_position('short', None, symbol)
                     else:
                         pass
                 else:
-                    self.open_position('short')
+                    self.open_position('short', None, symbol)
 
-    def open_position(self, direction, chat_id=None):
+    def open_position(self, direction, chat_id=None, symbol=None):
+        if symbol is None:
+            symbol = TRADING_SYMBOLS[0]  # Default to first symbol for manual commands
+            
         with self.trade_lock:
-            if direction == 'long' and self.current_long_position:
-                print("[TRADE] Cannot open LONG: an open LONG position already exists.")
-                self.send_telegram_message("❌ Cannot open LONG: Position already exists", chat_id)
+            data = self.symbol_data[symbol]
+            config = SYMBOL_CONFIG[symbol]
+            
+            # Check if position already exists for this symbol
+            if direction == 'long' and data['long_position']:
+                print(f"[TRADE] {symbol} Cannot open LONG: an open LONG position already exists.")
+                self.send_telegram_message(f"❌ {symbol} Cannot open LONG: Position already exists", chat_id)
                 return
-            if direction == 'short' and self.current_short_position:
-                print("[TRADE] Cannot open SHORT: an open SHORT position already exists.")
-                self.send_telegram_message("❌ Cannot open SHORT: Position already exists", chat_id)
+            if direction == 'short' and data['short_position']:
+                print(f"[TRADE] {symbol} Cannot open SHORT: an open SHORT position already exists.")
+                self.send_telegram_message(f"❌ {symbol} Cannot open SHORT: Position already exists", chat_id)
                 return
         
-            price = self.get_current_price()
+            price = self.get_current_price(symbol)
             if price is None:
-                print("[TRADE] Failed to fetch current price for open position.")
-                self.send_telegram_message("❌ Failed to fetch price for opening position", chat_id)
+                print(f"[TRADE] {symbol} Failed to fetch current price for open position.")
+                self.send_telegram_message(f"❌ {symbol} Failed to fetch price for opening position", chat_id)
                 return
             
             available = self.fetch_real_balance()
@@ -914,14 +1141,14 @@ Use the buttons below to control the bot or type /help for more information.
             current_time = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
             if direction == 'long':
-                stop_loss_level = LONG_STOP_LOSS_LEVEL
-                take_profit_level = LONG_TAKE_PROFIT_LEVEL
+                stop_loss_level = config['long_stop_loss_level']
+                take_profit_level = config['long_take_profit_level']
             else:
-                stop_loss_level = SHORT_STOP_LOSS_LEVEL
-                take_profit_level = SHORT_TAKE_PROFIT_LEVEL
+                stop_loss_level = config['short_stop_loss_level']
+                take_profit_level = config['short_take_profit_level']
             
-            initial_risk = self.current_atr_value * stop_loss_level
-            initial_profit = self.current_atr_value * take_profit_level
+            initial_risk = data['current_atr_value'] * stop_loss_level
+            initial_profit = data['current_atr_value'] * take_profit_level
 
             if direction == 'long':
                 stop_loss = price - initial_risk
@@ -932,6 +1159,7 @@ Use the buttons below to control the bot or type /help for more information.
                 take_profit = price - initial_profit
 
             trade = {
+                'symbol': symbol,
                 'entry_time': current_time,
                 'exit_time': None,
                 'action': direction,
@@ -951,18 +1179,18 @@ Use the buttons below to control the bot or type /help for more information.
                 'original_size': size
             }
             
-            self.send_order(direction, price, size)
+            self.send_order(direction, price, size, symbol)
 
             if direction == 'long':
-                self.current_long_position = trade
+                data['long_position'] = trade
             else:
-                self.current_short_position = trade
+                data['short_position'] = trade
 
             self.trades.append(trade)
             self.save_trades()
             
             self.send_telegram_message(
-                f"✅ *OPENED {direction.upper()} POSITION*\n"
+                f"✅ *OPENED {symbol} {direction.upper()} POSITION*\n"
                 f"Price: `${price:.2f}`\n"
                 f"Size: `{size:.2f}`\n"
                 f"SL: `${stop_loss:.2f}`\n"
@@ -970,9 +1198,10 @@ Use the buttons below to control the bot or type /help for more information.
                 f"Leverage: `{LEVERAGE}x`",
                 chat_id
             )
-            print(f"[TRADE] 🟢 Opened {direction.upper()} position at ${price:.2f}, size: {size:.2f}, SL: ${stop_loss:.2f}")
+            print(f"[TRADE] 🟢 {symbol} Opened {direction.upper()} position at ${price:.2f}, size: {size:.2f}, SL: ${stop_loss:.2f}")
 
     def close_trade(self, trade, current_price, reason, chat_id=None):
+        symbol = trade.get('symbol', TRADING_SYMBOLS[0])
         with self.trade_lock:
             trade['exit_time'] = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
             trade['exit_price'] = current_price
@@ -989,17 +1218,18 @@ Use the buttons below to control the bot or type /help for more information.
             trade['status'] = 'closed'
             trade['reason'] = reason
             
+            data = self.symbol_data[symbol]
             if trade['action'] == 'long':
-                self.current_long_position = None
+                data['long_position'] = None
             else:
-                self.current_short_position = None
+                data['short_position'] = None
 
-            self.send_order(f'exit_{trade["action"]}', current_price, trade['size'], 100)
+            self.send_order(f'exit_{trade["action"]}', current_price, trade['size'], 100, symbol)
             self.save_trades()
 
             pnl_percent = (trade['pnl'] / (trade['entry_price'] * trade['size'] / LEVERAGE)) * 100
             self.send_telegram_message(
-                f"🔴 *CLOSED {trade['action'].upper()} POSITION*\n"
+                f"🔴 *CLOSED {symbol} {trade['action'].upper()} POSITION*\n"
                 f"Entry: `${trade['entry_price']:.2f}`\n"
                 f"Exit: `${current_price:.2f}`\n"
                 f"PNL: `${trade['pnl']:.2f}` ({pnl_percent:+.2f}%)\n"
@@ -1007,61 +1237,96 @@ Use the buttons below to control the bot or type /help for more information.
                 chat_id
             )
             
-            print(f"[TRADE] 🔴 Closed {trade['action'].upper()} position | "
+            print(f"[TRADE] 🔴 {symbol} Closed {trade['action'].upper()} position | "
                   f"Entry: ${trade['entry_price']:.2f} | "
                   f"Exit: ${current_price:.2f} | "
                   f"PNL: ${trade['pnl']:.2f} (Fee: ${trade['fee']:.2f}) | "
                   f"Reason: {reason}")
 
-    def close_position(self, direction, reason="signal", chat_id=None):
-        if direction == 'long' and self.current_long_position:
-            position = self.current_long_position
-        elif direction == 'short' and self.current_short_position:
-            position = self.current_short_position
+    def close_position(self, direction, reason="signal", chat_id=None, symbol=None):
+        if symbol is None:
+            # Try to find any open position of this direction
+            for sym in TRADING_SYMBOLS:
+                data = self.symbol_data[sym]
+                if direction == 'long' and data['long_position']:
+                    symbol = sym
+                    break
+                elif direction == 'short' and data['short_position']:
+                    symbol = sym
+                    break
+            
+            if symbol is None:
+                print(f"[TRADE] No open {direction.upper()} positions to close 🤷‍♂️")
+                self.send_telegram_message(f"❌ No open {direction.upper()} position to close", chat_id)
+                return
+        
+        data = self.symbol_data[symbol]
+        if direction == 'long' and data['long_position']:
+            position = data['long_position']
+        elif direction == 'short' and data['short_position']:
+            position = data['short_position']
         else:
-            print(f"[TRADE] No open {direction.upper()} positions to close 🤷‍♂️")
-            self.send_telegram_message(f"❌ No open {direction.upper()} position to close", chat_id)
+            print(f"[TRADE] {symbol} No open {direction.upper()} positions to close 🤷‍♂️")
+            self.send_telegram_message(f"❌ {symbol} No open {direction.upper()} position to close", chat_id)
             return
             
-        current_price = self.get_current_price()
+        current_price = self.get_current_price(symbol)
         if current_price is None:
-            print("[TRADE] Failed to fetch current price for closing positions")
-            self.send_telegram_message("❌ Failed to fetch price for closing position", chat_id)
+            print(f"[TRADE] {symbol} Failed to fetch current price for closing positions")
+            self.send_telegram_message(f"❌ {symbol} Failed to fetch price for closing position", chat_id)
             return
 
         self.close_trade(position, current_price, reason, chat_id)
 
-    def close_half_position(self, direction, chat_id=None):
+    def close_half_position(self, direction, chat_id=None, symbol=None):
         """Manually close half of the position"""
-        if direction == 'long' and self.current_long_position:
-            position = self.current_long_position
-        elif direction == 'short' and self.current_short_position:
-            position = self.current_short_position
+        if symbol is None:
+            # Try to find any open position of this direction
+            for sym in TRADING_SYMBOLS:
+                data = self.symbol_data[sym]
+                if direction == 'long' and data['long_position']:
+                    symbol = sym
+                    break
+                elif direction == 'short' and data['short_position']:
+                    symbol = sym
+                    break
+            
+            if symbol is None:
+                print(f"[HALF EXIT] No open {direction.upper()} positions to close half 🤷‍♂️")
+                return
+        
+        data = self.symbol_data[symbol]
+        if direction == 'long' and data['long_position']:
+            position = data['long_position']
+        elif direction == 'short' and data['short_position']:
+            position = data['short_position']
         else:
-            print(f"[HALF EXIT] No open {direction.upper()} positions to close half 🤷‍♂️")
+            print(f"[HALF EXIT] {symbol} No open {direction.upper()} positions to close half 🤷‍♂️")
             return
 
         if position.get('half_exit_done', False):
-            print(f"[HALF EXIT] Half exit already executed for {direction.upper()} position")
+            print(f"[HALF EXIT] {symbol} Half exit already executed for {direction.upper()} position")
             return
 
-        current_price = self.get_current_price()
+        current_price = self.get_current_price(symbol)
         if current_price is None:
-            print("[HALF EXIT] Failed to fetch current price")
+            print(f"[HALF EXIT] {symbol} Failed to fetch current price")
             return
 
-        self.execute_half_exit(position, current_price, chat_id)
+        self.execute_half_exit(position, current_price, chat_id, symbol)
 
     # ========== Risk Management ==========
     def monitor_positions(self):
         print("[MONITOR] Starting real-time position monitoring (every 1s)...")
         while self.running:
             try:
-                current_price = self.get_current_price()
-                if current_price:
-                    self.check_risk(current_price)
-                else:
-                    print("[MONITOR] Skipping — price unavailable")
+                # Check all symbols
+                for symbol in TRADING_SYMBOLS:
+                    current_price = self.get_current_price(symbol)
+                    if current_price:
+                        self.check_risk(current_price, symbol)
+                    else:
+                        print(f"[MONITOR] {symbol} Skipping — price unavailable")
                 
                 # Sleep exactly 1 second before next check
                 time.sleep(1)
@@ -1070,20 +1335,21 @@ Use the buttons below to control the bot or type /help for more information.
                 print(f"[MONITOR] Error: {e}")
                 time.sleep(1)
 
-    def check_risk(self, current_price):
+    def check_risk(self, current_price, symbol):
+        data = self.symbol_data[symbol]
         
-        if self.current_long_position:
-            self.update_trailing_stop(current_price, self.current_long_position)
-        if self.current_short_position:
-            self.update_trailing_stop(current_price, self.current_short_position)
+        if data['long_position']:
+            self.update_trailing_stop(current_price, data['long_position'])
+        if data['short_position']:
+            self.update_trailing_stop(current_price, data['short_position'])
 
         # Check long position
-        if self.current_long_position:
-            position = self.current_long_position
+        if data['long_position']:
+            position = data['long_position']
             if current_price <= position['stop_loss']:
-                print(f"[RISK] Stop loss hit for LONG: ${current_price:.2f} <= ${position['stop_loss']:.2f}")
+                print(f"[RISK] {symbol} Stop loss hit for LONG: ${current_price:.2f} <= ${position['stop_loss']:.2f}")
                 self.send_telegram_message(
-                    f"🛑 *STOP LOSS HIT - LONG*\n"
+                    f"🛑 *STOP LOSS HIT - {symbol} LONG*\n"
                     f"Price: `${current_price:.2f}`\n"
                     f"Stop Loss: `${position['stop_loss']:.2f}`"
                 )
@@ -1091,12 +1357,12 @@ Use the buttons below to control the bot or type /help for more information.
                 return
 
         # Check short position  
-        if self.current_short_position:
-            position = self.current_short_position
+        if data['short_position']:
+            position = data['short_position']
             if current_price >= position['stop_loss']:
-                print(f"[RISK] Stop loss hit for SHORT: ${current_price:.2f} >= ${position['stop_loss']:.2f}")
+                print(f"[RISK] {symbol} Stop loss hit for SHORT: ${current_price:.2f} >= ${position['stop_loss']:.2f}")
                 self.send_telegram_message(
-                    f"🛑 *STOP LOSS HIT - SHORT*\n"
+                    f"🛑 *STOP LOSS HIT - {symbol} SHORT*\n"
                     f"Price: `${current_price:.2f}`\n"
                     f"Stop Loss: `${position['stop_loss']:.2f}`"
                 )
@@ -1104,11 +1370,13 @@ Use the buttons below to control the bot or type /help for more information.
                 return
 
     # ========== Utility Methods ==========
-    def send_order(self, action, price, size=None, per=None):
+    def send_order(self, action, price, size=None, per=None, symbol=None):
+        if symbol is None:
+            symbol = TRADING_SYMBOLS[0]
         if action in ["short", "long"]:
             side = "sell" if action == "short" else "buy"
             params = {
-                "symbol": TAOUSDT_SYMBOL,
+                "symbol": symbol,
                 "productType": PRODUCT_TYPE,
                 "marginMode" : MARGIN_MODE,
                 "marginCoin": MARGIN_COIN,
@@ -1125,7 +1393,7 @@ Use the buttons below to control the bot or type /help for more information.
         elif action in ["exit_short", "exit_long"]:
             side = "buy" if action == "exit_long" else "sell"
             params = {
-                "symbol": TAOUSDT_SYMBOL,
+                "symbol": symbol,
                 "productType": PRODUCT_TYPE,
                 "marginMode" : MARGIN_MODE,
                 "marginCoin": MARGIN_COIN,
@@ -1140,30 +1408,31 @@ Use the buttons below to control the bot or type /help for more information.
         else:
             return
         
-        print(f"[Signal 🟡] Sending: {params}")
+        print(f"[Signal 🟡] {symbol} Sending: {params}")
 
         if self.flag_api_sent:
             try:
                 response = self.maxOrderApi.placeOrder(params)
                 result = response.json()
                 if result.get('code') == '00000':
-                    print(f"[Signal 🟢] Order placed successfully: {result.get('data')}")
+                    print(f"[Signal 🟢] {symbol} Order placed successfully: {result.get('data')}")
                 else:
-                    print(f"[Signal 🔴] Order placement failed: {result.get('msg')}")
+                    print(f"[Signal 🔴] {symbol} Order placement failed: {result.get('msg')}")
             except Exception as e:
-                print("[Signal 🔴] Failed order :", e)
+                print(f"[Signal 🔴] {symbol} Failed order :", e)
         else:
-            print("[Signal 🟡] Order sending is disabled. Order not sent.")
+            print(f"[Signal 🟡] {symbol} Order sending is disabled. Order not sent.")
 
     def save_trades(self):
         try:
             with open(CSV_FILE, 'w', newline='') as f:
                 writer = csv.writer(f)
-                writer.writerow(['entry_time', 'exit_time', 'action', 'entry_price', 'exit_price', 
+                writer.writerow(['symbol', 'entry_time', 'exit_time', 'action', 'entry_price', 'exit_price', 
                                'size', 'status', 'fee', 'ideal_pnl', 'pnl', 'reason', 'stop_loss', 
                                'take_profit', 'max_profit_price', 'trailing_stop_active', 'half_exit_done', 'original_size'])
                 for trade in self.trades:
                     writer.writerow([
+                        trade.get('symbol', TRADING_SYMBOLS[0]),
                         trade['entry_time'],
                         trade['exit_time'],
                         trade['action'],
@@ -1224,7 +1493,7 @@ def main():
     print("🤖 Starting Trading Bot with Telegram control...")
     print("✅ Trading strategies are running in background")
     print("✅ Telegram bot is ready for commands")
-    print("✅ Bot is OPEN TO ALL USERS - no authentication required")
+    print(f"✅ Bot is restricted to authorized chat ID: {AUTHORIZED_CHAT_ID}")
     print("✅ Send /start to your bot to begin")
     
     application.run_polling()
