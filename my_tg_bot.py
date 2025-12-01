@@ -557,7 +557,6 @@ Use the buttons below to control the bot or type /help for more information.
             total_pnl = sum(trade['pnl'] for trade in closed_trades)
             win_trades = len([t for t in closed_trades if t['pnl'] > 0])
             win_rate = (win_trades / len(closed_trades)) * 100 if closed_trades else 0
-            self.balance = self.fetch_real_balance()
             balance_msg = f"""
 💼 *Account Balance:*
 • Current Balance: `${self.balance:.4f}`
@@ -1325,9 +1324,12 @@ Use the buttons below to control the bot or type /help for more information.
                 self.send_telegram_message(f"❌ {symbol} Failed to fetch price for opening position")
                 return
             
-            available = self.fetch_real_balance()
+            # Only update balance if there are no open positions
+            # If there are open positions, use the existing balance
+            if total_open_positions == 0:
+                self.balance = self.fetch_real_balance()
             
-            size = round((available * POSITION_SIZE_RATIO * LEVERAGE) / price, 2)
+            size = round((self.balance * POSITION_SIZE_RATIO * LEVERAGE) / price, 2)
 
             current_time = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
