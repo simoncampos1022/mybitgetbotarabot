@@ -957,7 +957,7 @@ Use the buttons below to control the bot or type /help for more information.
 
             self.trades.append(half_trade)
 
-            self.send_order(f'exit_{position["action"]}', current_price, half_size, 50, symbol)
+            # self.send_order(f'exit_{position["action"]}', current_price, half_size, 50, symbol)
 
             self.send_telegram_message(f"[HALF EXIT] 🔵 {symbol} Executed half exit for {position['action'].upper()} position | "
                   f"Exit Price: ${current_price:.2f} | "
@@ -1179,7 +1179,7 @@ Use the buttons below to control the bot or type /help for more information.
                 'original_size': size
             }
             
-            self.send_order(direction, price, size, symbol)
+            # self.send_order(direction, price, size, symbol)
 
             if direction == 'long':
                 data['long_position'] = trade
@@ -1224,7 +1224,7 @@ Use the buttons below to control the bot or type /help for more information.
             else:
                 data['short_position'] = None
 
-            self.send_order(f'exit_{trade["action"]}', current_price, trade['size'], 100, symbol)
+            # self.send_order(f'exit_{trade["action"]}', current_price, trade['size'], 100, symbol)
             self.save_trades()
 
             pnl_percent = (trade['pnl'] / (trade['entry_price'] * trade['size'] / LEVERAGE)) * 100
