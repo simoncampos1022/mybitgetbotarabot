@@ -167,12 +167,6 @@ class AutoTradeBot:
         self.balance = self.fetch_real_balance()
         self.initial_balance = self.balance if self.balance is not None else 100.0
         
-        # User state management for symbol selection
-        self.user_states = {}  # {chat_id: {'action': 'open_long', 'symbol': None}}
-        
-        # User state management for symbol selection
-        self.user_states = {}  # {chat_id: {'action': 'open_long', 'symbol': None}}
-        
         # Set leverage for all symbols
         for symbol in TRADING_SYMBOLS:
             self.set_leverage(LEVERAGE, symbol)
