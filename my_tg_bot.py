@@ -192,7 +192,7 @@ class AutoTradeBot:
                 with open(CSV_FILE, 'r') as f:
                     reader = csv.DictReader(f)
                     for row in reader:
-                        symbol = row.get('symbol', TRADING_SYMBOLS[0])  # Default to first symbol for old data
+                        symbol = row.get('symbol')  # Default to first symbol for old data
                         trade_data = {
                             'symbol': symbol,
                             'entry_time': row['entry_time'],
@@ -865,7 +865,7 @@ Use the buttons below to control the bot or type /help for more information.
     def set_leverage(self, leverage=10, symbol=None):
         """Set leverage for a symbol in USDT-FUTURES"""
         if symbol is None:
-            symbol = TRADING_SYMBOLS[0]
+            return
         try:
             params = {
                 "symbol": symbol,
@@ -884,7 +884,7 @@ Use the buttons below to control the bot or type /help for more information.
     # ========== Data Fetching & Indicators ==========
     def get_current_price(self, symbol=None):
         if symbol is None:
-            symbol = TRADING_SYMBOLS[0]
+            return
         try:
             params = {
                 "symbol": symbol,
@@ -911,7 +911,7 @@ Use the buttons below to control the bot or type /help for more information.
 
     def fetch_candles(self, interval: str, limit: int, symbol=None):
         if symbol is None:
-            symbol = TRADING_SYMBOLS[0]
+            return
         params = {
             "symbol": symbol,
             "productType": PRODUCT_TYPE,
@@ -1018,7 +1018,7 @@ Use the buttons below to control the bot or type /help for more information.
         if not position:
             return
         
-        symbol = position.get('symbol', TRADING_SYMBOLS[0])
+        symbol = position.get('symbol')
         config = SYMBOL_CONFIG[symbol]
         data = self.symbol_data[symbol]
         take_profit = position['take_profit']
@@ -1071,7 +1071,7 @@ Use the buttons below to control the bot or type /help for more information.
     def execute_half_exit(self, position, current_price, symbol=None):
         """Execute half position exit and update position size"""
         if symbol is None:
-            symbol = position.get('symbol', TRADING_SYMBOLS[0])
+            symbol = position.get('symbol')
         with self.trade_lock:
             if position.get('half_exit_done', False):
                 print(f"[HALF EXIT] {symbol} Half exit already executed for {position['action'].upper()} position")
@@ -1251,11 +1251,11 @@ Use the buttons below to control the bot or type /help for more information.
                 if long_pos:
                     if current_price < long_pos['entry_price']:
                         self.close_position('long', "Replace", symbol)
-                        self.open_position('long', None, symbol)
+                        self.open_position('long', symbol)
                     else:
                         pass
                 else:
-                    self.open_position('long', None, symbol)
+                    self.open_position('long', symbol)
                     
         elif fs_cross_down:
             # Short entry conditions with symbol-specific operators
@@ -1274,15 +1274,15 @@ Use the buttons below to control the bot or type /help for more information.
                 if short_pos:
                     if current_price > short_pos['entry_price']:
                         self.close_position('short', "Replace", symbol)
-                        self.open_position('short', None, symbol)
+                        self.open_position('short', symbol)
                     else:
                         pass
                 else:
-                    self.open_position('short', None, symbol)
+                    self.open_position('short', symbol)
 
     def open_position(self, direction, symbol=None):
         if symbol is None:
-            symbol = TRADING_SYMBOLS[0]  # Default to first symbol for manual commands
+            return
             
         with self.trade_lock:
             # Check total number of open positions across all symbols
@@ -1402,7 +1402,7 @@ Use the buttons below to control the bot or type /help for more information.
             print(f"[TRADE] 🟢 {symbol} Opened {direction.upper()} position at ${price:.4f}, size: {size:.4f}, SL: ${stop_loss:.4f}")
 
     def close_trade(self, trade, current_price, reason):
-        symbol = trade.get('symbol', TRADING_SYMBOLS[0])
+        symbol = trade.get('symbol')
         with self.trade_lock:
             trade['exit_time'] = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
             trade['exit_price'] = current_price
@@ -1723,7 +1723,7 @@ Use the buttons below to control the bot or type /help for more information.
     def send_order(self, action, price, size=None, symbol=None):
         """Send order to exchange and return (success: bool, error_msg: str)"""
         if symbol is None:
-            symbol = TRADING_SYMBOLS[0]
+            return
         if action in ["short", "long"]:
             side = "sell" if action == "short" else "buy"
             params = {
@@ -1789,7 +1789,7 @@ Use the buttons below to control the bot or type /help for more information.
                                'take_profit', 'max_profit_price', 'trailing_stop_active', 'half_exit_done', 'original_size'])
                 for trade in self.trades:
                     writer.writerow([
-                        trade.get('symbol', TRADING_SYMBOLS[0]),
+                        trade.get('symbol'),
                         trade['entry_time'],
                         trade['exit_time'],
                         trade['action'],
