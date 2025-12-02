@@ -546,6 +546,7 @@ Use the buttons below to control the bot or type /help for more information.
             )
             
         elif message_text == "💰 Balance":
+            self.balance = self.fetch_real_balance()
             closed_trades = [t for t in self.trades if t['status'] == 'closed']
             total_pnl = sum(trade['pnl'] for trade in closed_trades)
             win_trades = len([t for t in closed_trades if t['pnl'] > 0])
@@ -1030,7 +1031,7 @@ Use the buttons below to control the bot or type /help for more information.
                 print(f"[TRAILING STOP] {symbol} New max profit price for LONG: ${position['max_profit_price']:.4f}")
 
             if not position.get('half_exit_done', False) and current_price >= take_profit:
-                self.execute_half_exit(position, current_price, None, symbol)
+                self.execute_half_exit(position, current_price, symbol)
                 position['trailing_stop_active'] = True
                 changed = True
 
@@ -1048,7 +1049,7 @@ Use the buttons below to control the bot or type /help for more information.
                 print(f"[TRAILING STOP] {symbol} New max profit price for SHORT: ${position['max_profit_price']:.4f}")
 
             if not position.get('half_exit_done', False) and current_price <= take_profit:
-                self.execute_half_exit(position, current_price, None, symbol)
+                self.execute_half_exit(position, current_price, symbol)
                 position['trailing_stop_active'] = True
                 changed = True
 
@@ -1085,8 +1086,6 @@ Use the buttons below to control the bot or type /help for more information.
             fee = (current_price + position['entry_price']) * FEE_PERCENT * half_size
             net_pnl = pnl - fee
 
-            self.balance += net_pnl
-
             half_trade = {
                 'symbol': symbol,
                 'entry_time': position['entry_time'],
@@ -1120,6 +1119,8 @@ Use the buttons below to control the bot or type /help for more information.
                 print(f"[HALF EXIT] 🔴 {symbol} Failed to half exit {position['action'].upper()} position - {order_error}")
                 return
             
+            self.balance = self.fetch_real_balance()
+
             # Order succeeded, update position and save
             position['size'] = remaining_size
             position['half_exit_done'] = True
@@ -1355,6 +1356,8 @@ Use the buttons below to control the bot or type /help for more information.
                 print(f"[TRADE] 🔴 {symbol} Failed to open {direction.upper()} position - {order_error}")
                 return
             
+            self.balance = self.fetch_real_balance()
+            
             # Order succeeded, create and save the position
             trade = {
                 'symbol': symbol,
@@ -1409,7 +1412,6 @@ Use the buttons below to control the bot or type /help for more information.
             trade['fee'] = (current_price + trade['entry_price']) * FEE_PERCENT * trade['size']
             trade['ideal_pnl'] = trade['pnl']
             trade['pnl'] -= trade['fee']
-            self.balance += trade['pnl']
             trade['status'] = 'closed'
             trade['reason'] = reason
             
@@ -1426,6 +1428,8 @@ Use the buttons below to control the bot or type /help for more information.
                 print(f"[TRADE] 🔴 {symbol} Failed to close {trade['action'].upper()} position - {order_error}")
                 # Don't update position status if order failed
                 return
+
+            self.balance = self.fetch_real_balance()
             
             # Order succeeded, finalize the close
             data = self.symbol_data[symbol]
@@ -1636,7 +1640,7 @@ Use the buttons below to control the bot or type /help for more information.
                         position['fee'] = (current_price + position['entry_price']) * FEE_PERCENT * position['size']
                         position['ideal_pnl'] = position['pnl']
                         position['pnl'] -= position['fee']
-                        self.balance += position['pnl']
+                        self.balance = self.fetch_real_balance()
                         position['status'] = 'closed'
                         position['reason'] = 'close_all_manual'
                         self.save_trades()
