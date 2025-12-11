@@ -30,7 +30,7 @@ FEE_PERCENT = 0.0006
 ATR_LENGTH = 14
 FS_LENGTH = 10
 RSI_LENGTH = 14
-MAX_OPEN_POSITIONS = 4  # Maximum number of open positions allowed
+MAX_OPEN_POSITIONS = 5  # Maximum number of open positions allowed
 
 # Symbol Configuration
 # Each symbol has: parameters (10 levels) and operators (6 operators: 3 for long, 3 for short)
@@ -1322,7 +1322,7 @@ Use the buttons below to control the bot or type /help for more information.
             # Only update balance if there are no open positions
             # If there are open positions, use the existing balance
 
-            size = round((self.balance * (1.0/(5-total_open_positions)) * LEVERAGE) / price, 2)
+            size = round((self.balance * (1.0/(MAX_OPEN_POSITIONS+1-total_open_positions)) * LEVERAGE) / price, 2)
 
             current_time = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
