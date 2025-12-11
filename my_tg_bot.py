@@ -30,7 +30,7 @@ FEE_PERCENT = 0.0006
 ATR_LENGTH = 14
 FS_LENGTH = 10
 RSI_LENGTH = 14
-MAX_OPEN_POSITIONS = 5  # Maximum number of open positions allowed
+MAX_OPEN_POSITIONS = 3  # Maximum number of open positions allowed
 
 # Symbol Configuration
 # Each symbol has: parameters (10 levels) and operators (6 operators: 3 for long, 3 for short)
@@ -51,20 +51,6 @@ SYMBOL_CONFIG = {
         "short_second_sl_level": 0.1,
         "short_operators": ("<", "<", ">"),  # (rsi_op, fs_op, vol_op)
     },
-    "SOLUSDT": {
-        "long_fs_entry_level": 3.2,
-        "long_rsi_entry_level": 9.0,
-        "long_stop_loss_level": 2.4,
-        "long_take_profit_level": 2.3,
-        "long_second_sl_level": 0.2,
-        "long_operators": ("<", "<", ">"),  # (rsi_op, fs_op, vol_op)
-        "short_fs_entry_level": 1.6,
-        "short_rsi_entry_level": 1.0,
-        "short_stop_loss_level": 1.5,
-        "short_take_profit_level": 1.8,
-        "short_second_sl_level": 2.9,
-        "short_operators": (">", "<", ">"),  # (rsi_op, fs_op, vol_op)
-    },
     "TAOUSDT": {
         "long_fs_entry_level": 4.8,
         "long_rsi_entry_level": 13.0,
@@ -78,34 +64,6 @@ SYMBOL_CONFIG = {
         "short_take_profit_level": 1.7,
         "short_second_sl_level": 0.1,
         "short_operators": (">", "<", ">"),  # (rsi_op, fs_op, vol_op)
-    },
-    "LINKUSDT": {
-        "long_fs_entry_level": 1.5,
-        "long_rsi_entry_level": 9.0,
-        "long_stop_loss_level": 3.0,
-        "long_take_profit_level": 3.0,
-        "long_second_sl_level": 1.3,
-        "long_operators": ("<", ">", ">"),  # (rsi_op, fs_op, vol_op)
-        "short_fs_entry_level": 2.0,
-        "short_rsi_entry_level": 10.0,
-        "short_stop_loss_level": 2.0,
-        "short_take_profit_level": 1.9,
-        "short_second_sl_level": 0.1,
-        "short_operators": ("<", "<", "<"),  # (rsi_op, fs_op, vol_op)
-    },
-    "SUSHIUSDT": {
-        "long_fs_entry_level": 1.9,
-        "long_rsi_entry_level": 11.0,
-        "long_stop_loss_level": 2.6,
-        "long_take_profit_level": 3.0,
-        "long_second_sl_level": 3.0,
-        "long_operators": ("<", ">", ">"),  # (rsi_op, fs_op, vol_op)
-        "short_fs_entry_level": 1.6,
-        "short_rsi_entry_level": 27.0,
-        "short_stop_loss_level": 1.8,
-        "short_take_profit_level": 3.0,
-        "short_second_sl_level": 0.1,
-        "short_operators": ("<", "<", "<"),  # (rsi_op, fs_op, vol_op)
     },
     "UNIUSDT": {
         "long_fs_entry_level": 1.1,
