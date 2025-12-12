@@ -104,6 +104,7 @@ class AutoTradeBot:
                 'current_rsi_value': 0.0,
                 'long_position': None,
                 'short_position': None,
+                'sizeMultiplier': None,  # Contract size multiplier from exchange
             }
         
         self.total_trades = 1
@@ -124,6 +125,10 @@ class AutoTradeBot:
         self.message_queue = Queue()
         self.balance = self.fetch_real_balance()
         self.initial_balance = self.balance if self.balance is not None else 100.0
+        
+        # Fetch contract specifications for all symbols
+        for symbol in TRADING_SYMBOLS:
+            self.fetch_contract_specs(symbol)
         
         # Set leverage for all symbols
         for symbol in TRADING_SYMBOLS:
@@ -815,6 +820,74 @@ Use the buttons below to control the bot or type /help for more information.
             print(f"[BALANCE 🔴] Error fetching balance: {e}")
             return None
 
+    def fetch_contract_specs(self, symbol):
+        """Fetch contract specifications (sizeMultiplier) from Bitget API"""
+        try:
+            params = {
+                "productType": PRODUCT_TYPE,
+                "symbol": symbol
+            }
+            response = self.maxMarketApi.contracts(params)
+            
+            if response.get('code') != '00000':
+                print(f"[CONTRACT SPECS 🔴] {symbol} API Error: {response.get('msg')}")
+                return None
+            
+            data = response.get('data', [])
+            if not data:
+                print(f"[CONTRACT SPECS 🔴] {symbol} No contract data returned")
+                return None
+            
+            # Find the contract for this symbol
+            contract = None
+            for item in data:
+                if item.get('symbol') == symbol:
+                    contract = item
+                    break
+            
+            if contract:
+                size_multiplier = contract.get('sizeMultiplier')
+                if size_multiplier is not None:
+                    # Convert to float if it's a string
+                    try:
+                        size_multiplier = float(size_multiplier)
+                    except (ValueError, TypeError):
+                        print(f"[CONTRACT SPECS 🔴] {symbol} Invalid sizeMultiplier: {size_multiplier}")
+                        return None
+                    
+                    self.symbol_data[symbol]['sizeMultiplier'] = size_multiplier
+                    print(f"[CONTRACT SPECS 🟢] {symbol} Size Multiplier: {size_multiplier}")
+                    return size_multiplier
+                else:
+                    print(f"[CONTRACT SPECS 🔴] {symbol} sizeMultiplier not found in contract data")
+                    return None
+            else:
+                print(f"[CONTRACT SPECS 🔴] {symbol} Contract not found in response")
+                return None
+                
+        except Exception as e:
+            print(f"[CONTRACT SPECS 🔴] {symbol} Error fetching contract specs: {e}")
+            return None
+    
+    def round_size_by_multiplier(self, size, symbol):
+        """Round size according to sizeMultiplier from contract specifications"""
+        if symbol is None:
+            return size
+        
+        size_multiplier = self.symbol_data.get(symbol, {}).get('sizeMultiplier')
+        if size_multiplier is None or size_multiplier <= 0:
+            # Fallback to 2 decimal places if sizeMultiplier not available
+            return round(size, 2)
+        
+        # Round to the nearest multiple of sizeMultiplier
+        rounded_size = round(size / size_multiplier) * size_multiplier
+        
+        # Ensure we don't return negative or zero sizes
+        if rounded_size <= 0:
+            rounded_size = size_multiplier
+        
+        return rounded_size
+
     def set_leverage(self, leverage=10, symbol=None):
         """Set leverage for a symbol in USDT-FUTURES"""
         if symbol is None:
@@ -1033,7 +1106,8 @@ Use the buttons below to control the bot or type /help for more information.
             if 'original_size' not in position:
                 position['original_size'] = position['size']
 
-            half_size = round(position['size'] / 2, 2)
+            half_size_raw = position['size'] / 2
+            half_size = self.round_size_by_multiplier(half_size_raw, symbol)
             remaining_size = position['size'] - half_size
 
             if position['action'] == 'long':
@@ -1280,7 +1354,8 @@ Use the buttons below to control the bot or type /help for more information.
             # Only update balance if there are no open positions
             # If there are open positions, use the existing balance
 
-            size = round((self.balance * (1.0/(MAX_OPEN_POSITIONS+1-total_open_positions)) * LEVERAGE) / price, 2)
+            calculated_size = (self.balance * (1.0/(MAX_OPEN_POSITIONS+1-total_open_positions)) * LEVERAGE) / price
+            size = self.round_size_by_multiplier(calculated_size, symbol)
 
             current_time = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
